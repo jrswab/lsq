@@ -6,14 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
 	"github.com/jrswab/lsq/config"
 	"github.com/jrswab/lsq/editor"
+	"github.com/jrswab/lsq/system"
 	"github.com/jrswab/lsq/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"olympos.io/encoding/edn"
 )
 
 func main() {
@@ -38,23 +37,9 @@ func main() {
 	lsqCfgDir := filepath.Join(lsqDir, *lsqCfgDirName)
 	cfgFile := filepath.Join(lsqCfgDir, *lsqCfgFileName)
 
-	// Read config file to determine preferred format
-	configData, err := os.ReadFile(cfgFile)
+	cfg, err := system.LoadConfig(cfgFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading config file: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Set defaults before extracting data from config file:
-	var cfg = &config.Config{
-		CfgVers:      1,
-		PreferredFmt: "Markdown",
-		FileNameFmt:  "yyyy_MM_dd",
-	}
-
-	err = edn.Unmarshal(configData, &cfg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error unmarshaling config data: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -68,26 +53,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Construct today's journal file path
-	var extension = ".md"
-	if cfg.PreferredFmt == "Org" {
-		extension = ".org"
-	}
-
-	// Get today's date in YYYY_MM_DD format
-	today := time.Now().Format(config.ConvertDateFormat(cfg.FileNameFmt))
-
-	journalPath := filepath.Join(journalsDir, today+extension)
-
-	// Create file if it doesn't exist
-	_, err = os.Stat(journalPath)
-
-	if os.IsNotExist(err) {
-		err := os.WriteFile(journalPath, []byte(""), 0644)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating journal file: %v\n", err)
-			os.Exit(1)
-		}
+	journalPath, err := system.GetTodaysJournal(cfg, journalsDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error setting journal path: %v\n", err)
+		os.Exit(1)
 	}
 
 	// After the file exists, branch based on mode

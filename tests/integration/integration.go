@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 )
 
 // TestHelper contains common utilities for integration tests
@@ -83,11 +82,6 @@ func (h *TestHelper) Cleanup() {
 
 	os.Setenv("EDITOR", h.OriginalEditor)
 	os.Setenv("HOME", h.OriginalHome)
-}
-
-// GetExpectedJournalPath returns the expected path for a journal file
-func (h *TestHelper) GetExpectedJournalPath(date time.Time) string {
-	return filepath.Join(h.JournalsDir, date.Format("2006_01_02")+".md")
 }
 
 // AssertFileExists checks if a file exists and contains expected content
