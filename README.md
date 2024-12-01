@@ -52,8 +52,8 @@ LSQ reads your Logseq configuration from `config.edn`. Supported settings:
 
 ## Dependencies
 
-- [Bubble Tea](github.com/charmbracelet/bubbletea): Terminal UI framework
-- [EDN](olympos.io/encoding/edn): Configuration file parsing
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea): Terminal UI framework
+- [EDN](https://olympos.io/encoding/edn): Configuration file parsing
 
 ## License
 
