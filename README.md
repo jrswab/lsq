@@ -55,6 +55,49 @@ LSQ reads your Logseq configuration from `config.edn`. Supported settings:
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea): Terminal UI framework
 - [EDN](https://olympos.io/encoding/edn): Configuration file parsing
 
+## Contributing
+
+First off, thank you for considering contributing to lsq! 🎉
+
+### Ways to Contribute
+
+- Report bugs
+- Suggest new features
+- Improve documentation
+- Submit pull requests
+- Share how you use lsq
+- Star the project on GitHub
+
+### Development Setup
+
+1. Fork the repository
+2. Clone your fork:
+```bash
+git clone https://github.com/your-username/lsq.git
+```
+3. Add the upstream remote:
+```bash
+git remote add upstream https://github.com/jrswab/lsq.git
+```
+4. Create a branch for your work:
+```bash
+git checkout -b your-feature-branch
+```
+
+### Pull Request Process
+
+1. Update the README.md with details of any interface changes if applicable
+2. Keep PRs focused - one feature or fix per PR
+3. Use clear, descriptive commit messages
+4. Make sure your branch is up to date with main before submitting
+5. Include a clear description of the changes in your PR
+
+### First Time Contributors
+
+New to contributing? Look for issues tagged with `good-first-issue` or `documentation`. These are great starting points!
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for a list of project contributors.
+
 ## License
 
 GPL v3
