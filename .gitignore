@@ -17,6 +17,8 @@
 !go.mod
 
 !README.md
+!CONTRIBUTORS.md
+!CHANGELOG.md
 !LICENSE
 
 # !Makefile
