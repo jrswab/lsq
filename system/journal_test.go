@@ -38,7 +38,6 @@ func TestBasicJournalCreation(t *testing.T) {
 			content: "Test entry for today's date.",
 			format:  "Markdown",
 		},
-		/* This feature does not yet exist
 		"Opening a Past Journal": {
 			helper:  i.NewTestHelper(t),
 			date:    time.Date(2024, 11, 28, 0, 0, 0, 0, time.UTC),
@@ -57,7 +56,6 @@ func TestBasicJournalCreation(t *testing.T) {
 			content: "",
 			format:  "Markdown",
 		},
-		*/
 		"Unicode Content": {
 			helper:  i.NewTestHelper(t),
 			date:    time.Now(),
@@ -100,12 +98,12 @@ func TestBasicJournalCreation(t *testing.T) {
 				t.Fatalf("Failed to load config file: %v", err)
 			}
 
-			if tc.content != "" {
-				today := tc.date.Format(config.ConvertDateFormat(cfg.FileNameFmt))
+			var date = tc.date.Format(config.ConvertDateFormat(cfg.FileNameFmt))
 
-				existingPath := filepath.Join(helper.JournalsDir, today+".md")
+			if tc.content != "" {
+				existingPath := filepath.Join(helper.JournalsDir, date+".md")
 				if tc.format != "Markdown" {
-					existingPath = filepath.Join(helper.JournalsDir, today+".org")
+					existingPath = filepath.Join(helper.JournalsDir, date+".org")
 				}
 
 				// Create the journal file to simulate existing data
@@ -116,7 +114,7 @@ func TestBasicJournalCreation(t *testing.T) {
 			}
 
 			// Get journal path and create the journal entry if needed
-			expectedPath, err := GetTodaysJournal(cfg, helper.JournalsDir)
+			expectedPath, err := GetJournal(cfg, helper.JournalsDir, date)
 			if err != nil {
 				t.Fatalf("Failed to get journal file: %v", err)
 			}
