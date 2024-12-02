@@ -3,9 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/jrswab/lsq/config"
 	"github.com/jrswab/lsq/editor"
@@ -22,6 +24,7 @@ func main() {
 	lsqCfgDirName := flag.String("l", "logseq", "The Logseq configuration directory to use.")
 	lsqCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
 	editorType := flag.String("e", "EDITOR", "The editor to use.")
+	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 
 	// Parse flags
 	flag.Parse()
@@ -53,7 +56,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	journalPath, err := system.GetTodaysJournal(cfg, journalsDir)
+	var date = time.Now().Format(config.ConvertDateFormat(cfg.FileNameFmt))
+	if *specDate != "" {
+		parsedDate, err := time.Parse("2006-01-02", *specDate)
+		if err != nil {
+			log.Printf("Error parsing date from -s flag: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Return date formatted to user configuration.
+		date = parsedDate.Format(config.ConvertDateFormat(cfg.FileNameFmt))
+	}
+
+	journalPath, err := system.GetJournal(cfg, journalsDir, date)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error setting journal path: %v\n", err)
 		os.Exit(1)

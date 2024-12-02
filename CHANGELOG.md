@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.1] - 2024-12-01
+## [0.3.0] - 2024-12-01
 ### Added
 - CHANGELOG.md
 - CONTRIBUTORS.md
 - Contributions section to README.md
+- Specify a specific journal page data to open.
 
 ### Changed
 - Link typos in README.md by [@kandros](https://github.com/jrswab/lsq/commits?author=kandros)
