@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2024-12-03
+### Added
+- Indent the line from any location on the line.
+- Unindent the line from any location on the line.
+
+### Changed
+- Set editor to Nano when $EDITOR is blank.
+- Moved SelectEditor logic into main.go loadEditor function.
+- Dried up text manipulation code on key combos.
+- Refactored TODO state cycling and todo priority cycling.
+
 ## [0.3.0] - 2024-12-01
 ### Added
 - CHANGELOG.md

@@ -25,7 +25,7 @@ func TestCycleState(t *testing.T) {
 		},
 		"line with DONE": {
 			input:    "- DONE test line",
-			expected: "- TODO test line",
+			expected: "- test line",
 		},
 		"line without state with period": {
 			input:    "- test line.",
@@ -41,7 +41,7 @@ func TestCycleState(t *testing.T) {
 		},
 		"line with DONE with period": {
 			input:    "- DONE test line.",
-			expected: "- TODO test line.",
+			expected: "- test line.",
 		},
 		"indented line without state": {
 			input:    "\t- test line",

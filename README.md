@@ -30,7 +30,7 @@ This opens today's journal in your default editor ($EDITOR environment variable)
 
 - `-c`: Specify config filename. (default: "config.edn")
 - `-d`: Specify Logseq directory name. (default: "Logseq")
-- `-e`: Set editor environment variable. (default: "EDITOR")
+- `-e`: Set editor environment variable. (default: "$EDITOR")
 - `-l`: Specify Logseq config directory name. (default: "logseq")
 - `-s`: Specify the journal date to open. (Must be `yyy-MM-dd` formatted)
 - `-t`: Use the built-in TUI instead of external editor.
@@ -41,6 +41,8 @@ This opens today's journal in your default editor ($EDITOR environment variable)
 - `Ctrl+C`: Quit
 - `Ctrl+T`: Cycle through TODO states on current line
 - `Ctrl+P`: Cycle through priority states on current line
+- `tab`: Indent the entire line from anywhere on the line.
+- `shift+tab`: Unindent the line from anywhere on te line.
 - Arrow keys: Navigate through text
 
 ## Configuration
