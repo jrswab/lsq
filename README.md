@@ -41,6 +41,8 @@ This opens today's journal in your default editor ($EDITOR environment variable)
 - `Ctrl+C`: Quit
 - `Ctrl+T`: Cycle through TODO states on current line
 - `Ctrl+P`: Cycle through priority states on current line
+- `tab`: Indent the entire line from anywhere on the line.
+- `shift+tab`: Unindent the line from anywhere on te line.
 - Arrow keys: Navigate through text
 
 ## Configuration
