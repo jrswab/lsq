@@ -16,68 +16,63 @@ var Priorities = []string{"[#A]", "[#B]", "[#C]"}
 // CycleState takes a line of text and returns the same line with the next TODO state.
 // If no state exists, it adds "TODO" at the start of the line.
 func CycleState(line string) string {
-	var cutset = " \t-"
+	// Extract indentation and content:
+	var indent, content, found = strings.Cut(line, "- ")
 
-	trimmed := strings.TrimLeft(line, cutset)
-	if trimmed == "" {
+	if !found {
 		return line
 	}
 
-	// Get indentation count.
-	// The -2 ensures we don't count the bullet point formatting as part of the indentation level.
-	indent := strings.Repeat("\t", (len(line)-2)-len(trimmed))
+	// Do nothing on an empty line:
+	if strings.EqualFold(content, "") {
+		return line
+	}
 
-	// Find current state
+	// Find current todo state:
 	var currentState string
 	for _, state := range States {
-		if strings.HasPrefix(trimmed, fmt.Sprintf("%s ", state)) {
+		if strings.HasPrefix(content, state) {
 			currentState = state
+			content = strings.TrimPrefix(content, state)
 			break
 		}
 	}
 
 	switch currentState {
 	case States[0]: // TODO
-		trimmed = strings.TrimPrefix(trimmed, fmt.Sprintf("%s ", currentState))
-		return fmt.Sprintf("%s- DOING %s", indent, trimmed)
+		return fmt.Sprintf("%s- DOING%s", indent, content)
 	case States[1]: // DOING
-		trimmed = strings.TrimPrefix(trimmed, fmt.Sprintf("%s ", currentState))
-		return fmt.Sprintf("%s- DONE %s", indent, trimmed)
+		return fmt.Sprintf("%s- DONE%s", indent, content)
 	case States[2]: // DONE
-		// take out "DONE" from the trimmed string before returning
-		trimmed = strings.TrimPrefix(trimmed, fmt.Sprintf("%s ", currentState))
-		return fmt.Sprintf("%s- TODO %s", indent, trimmed)
+		return fmt.Sprintf("%s-%s", indent, content)
 	default:
-		return fmt.Sprintf("%s- TODO %s", indent, trimmed)
+		return fmt.Sprintf("%s- TODO %s", indent, content)
 	}
 }
 
 // CyclePriority takes a line of text and returns the same line with the next priority level.
 // Only adds/cycles priority if the line starts with a TODO state.
 func CyclePriority(line string) string {
-	var cutset = " \t-"
+	// Extract indentation and content:
+	var indent, content, _ = strings.Cut(line, "- ")
 
-	trimmed := strings.TrimLeft(line, cutset)
-	if trimmed == "" {
+	// Do nothing on an empty line:
+	if strings.EqualFold(content, "") {
 		return line
 	}
-
-	// Get indentation count.
-	// The -2 ensures we don't count the bullet point formatting as part of the indentation level.
-	indent := strings.Repeat("\t", (len(line)-2)-len(trimmed))
 
 	// Check if line starts with a TODO state
 	var (
 		hasState    bool
 		statePrefix string
-		content     = trimmed
 	)
 
 	for _, state := range States {
-		if strings.HasPrefix(trimmed, fmt.Sprintf("%s ", state)) {
+		if strings.HasPrefix(content, fmt.Sprintf("%s ", state)) {
 			hasState = true
 			statePrefix = state
-			content = trimmed[len(statePrefix)+1:] // the "+1" takes out the leading space
+
+			content = strings.TrimPrefix(content, fmt.Sprintf("%s ", state))
 			break
 		}
 	}
@@ -92,16 +87,17 @@ func CyclePriority(line string) string {
 	for _, priority := range Priorities {
 		if strings.HasPrefix(content, fmt.Sprintf("%s ", priority)) {
 			currentPriority = priority
-			content = content[len(currentPriority)+1:]
+
+			content = strings.TrimPrefix(content, fmt.Sprintf("%s ", priority))
 			break
 		}
 	}
 
 	switch currentPriority {
 	case Priorities[0]: // [#A]
-		return fmt.Sprintf("%s- %s %s %s", indent, statePrefix, Priorities[1], content)
+		return fmt.Sprintf("%s- %s [#B] %s", indent, statePrefix, content)
 	case Priorities[1]: // [#B]
-		return fmt.Sprintf("%s- %s %s %s", indent, statePrefix, Priorities[2], content)
+		return fmt.Sprintf("%s- %s [#C] %s", indent, statePrefix, content)
 	case Priorities[2]: // [#C]
 		return fmt.Sprintf("%s- %s %s", indent, statePrefix, content)
 	default:

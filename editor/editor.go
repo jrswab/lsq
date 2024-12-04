@@ -1,17 +1,19 @@
 package editor
 
-import "os"
+import (
+	"fmt"
+	"strings"
+)
 
-func Select(editor string) string {
-	if editor == "" {
-		return "vim"
+func AddTab(line string) string {
+	return fmt.Sprintf("\t%s", line)
+}
+
+func RemoveTab(line string) string {
+	// When \t is added to a line, BubbleTea adds
+	// 4 space characters instead of one tab character.
+	if strings.HasPrefix(line, "    ") {
+		return line[4:]
 	}
-
-	checkEnv := os.Getenv(editor)
-	if checkEnv != "" {
-		return checkEnv
-	}
-
-	// Return whatever if not Env Var
-	return editor
+	return line
 }

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jrswab/lsq/config"
-	"github.com/jrswab/lsq/editor"
 	"github.com/jrswab/lsq/system"
 	"github.com/jrswab/lsq/tui"
 
@@ -96,12 +95,19 @@ func loadTui(cfg *config.Config, path string) {
 	}
 }
 
-func loadEditor(program, path string) {
+func loadEditor(editor, path string) {
 	// Get editor from environment
-	editing := editor.Select(program)
+	if editor == "" {
+		editor = os.Getenv(editor)
+		// if still blank, use nano
+		if editor == "" {
+			log.Println("$EDITOR is blank, using Nano.")
+			editor = "nano"
+		}
+	}
 
 	// Open file in editor
-	cmd := exec.Command(editing, path)
+	cmd := exec.Command(editor, path)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

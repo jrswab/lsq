@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/jrswab/lsq/config"
+	"github.com/jrswab/lsq/editor"
 	"github.com/jrswab/lsq/todo"
 
 	"github.com/charmbracelet/bubbles/textarea"
@@ -76,41 +76,22 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return statusMsg{}
 			})
 
+		case tea.KeyTab:
+			manipulateText(&m, editor.AddTab)
+
+		case tea.KeyShiftTab:
+			manipulateText(&m, editor.RemoveTab)
+
 		// Cycle through TODO states:
 		case tea.KeyCtrlT:
-			// Get current content and line number
-			content := m.textarea.Value()
-			lineNum := m.textarea.Line()
+			manipulateText(&m, todo.CycleState)
 
-			// Split content into lines
-			lines := strings.Split(content, "\n")
-
-			// Make sure we're within bounds
-			if lineNum < len(lines) {
-				// Update the specific line
-				lines[lineNum] = todo.CycleState(lines[lineNum])
-
-				// Join lines back together
-				newContent := strings.Join(lines, "\n")
-
-				// Update textarea
-				m.textarea.SetValue(newContent)
-			}
 		case tea.KeyCtrlP:
-			content := m.textarea.Value()
-			lineNum := m.textarea.Line()
-
-			lines := strings.Split(content, "\n")
-
-			if lineNum < len(lines) {
-				lines[lineNum] = todo.CyclePriority(lines[lineNum])
-				newContent := strings.Join(lines, "\n")
-				m.textarea.SetValue(newContent)
-			}
+			manipulateText(&m, todo.CyclePriority)
 		}
 
 	case tea.WindowSizeMsg:
-		m.textarea.SetWidth(msg.Width)
+		m.textarea.SetWidth(msg.Width - 2)
 		m.textarea.SetHeight(msg.Height - 2)
 	}
 
@@ -119,15 +100,14 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m tuiModel) View() string {
-	var footer string
+	var footer = "^S save, ^C quit"
+
 	if m.statusMsg != "" {
 		footer = m.statusMsg
-	} else {
-		footer = "^S save, ^C quit"
 	}
 
 	return fmt.Sprintf(
-		"LSQ TUI Mode - %s\n%s\n%s",
+		"LSQ TUI - %s\n%s\n%s",
 		filepath.Base(m.filepath),
 		m.textarea.View(),
 		footer,

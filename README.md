@@ -30,7 +30,7 @@ This opens today's journal in your default editor ($EDITOR environment variable)
 
 - `-c`: Specify config filename. (default: "config.edn")
 - `-d`: Specify Logseq directory name. (default: "Logseq")
-- `-e`: Set editor environment variable. (default: "EDITOR")
+- `-e`: Set editor environment variable. (default: "$EDITOR")
 - `-l`: Specify Logseq config directory name. (default: "logseq")
 - `-s`: Specify the journal date to open. (Must be `yyy-MM-dd` formatted)
 - `-t`: Use the built-in TUI instead of external editor.
