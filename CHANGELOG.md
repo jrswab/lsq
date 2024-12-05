@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2024-12-04
+### Changed
+- fmt to log in main.go
+
+### Fixed
+- Failure to load $EDITOR when -t is omitted.
+
 ## [0.4.0] - 2024-12-03
 ### Added
 - Indent the line from any location on the line.

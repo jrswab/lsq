@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -30,7 +29,7 @@ func main() {
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting home directory: %v\n", err)
+		log.Printf("Error getting home directory: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -41,7 +40,7 @@ func main() {
 
 	cfg, err := system.LoadConfig(cfgFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading configuration: %v\n", err)
+		log.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -51,7 +50,7 @@ func main() {
 	// Create journals directory if it doesn't exist
 	err = os.MkdirAll(journalsDir, 0755)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating journals directory: %v\n", err)
+		log.Printf("Error creating journals directory: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -69,7 +68,7 @@ func main() {
 
 	journalPath, err := system.GetJournal(cfg, journalsDir, date)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error setting journal path: %v\n", err)
+		log.Printf("Error setting journal path: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -90,20 +89,18 @@ func loadTui(cfg *config.Config, path string) {
 	)
 
 	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error running program: %v", err)
+		log.Printf("Error running program: %v", err)
 		os.Exit(1)
 	}
 }
 
 func loadEditor(editor, path string) {
 	// Get editor from environment
+	editor = os.Getenv(editor)
+	// if still blank, use nano
 	if editor == "" {
-		editor = os.Getenv(editor)
-		// if still blank, use nano
-		if editor == "" {
-			log.Println("$EDITOR is blank, using Nano.")
-			editor = "nano"
-		}
+		log.Println("$EDITOR is blank, using Nano.")
+		editor = "nano"
 	}
 
 	// Open file in editor
@@ -114,7 +111,7 @@ func loadEditor(editor, path string) {
 
 	err := cmd.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error opening editor: %v\n", err)
+		log.Printf("Error opening editor: %v\n", err)
 		os.Exit(1)
 	}
 }
