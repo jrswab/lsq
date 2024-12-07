@@ -3,13 +3,18 @@
 A command-line tool for rapid journal entry creation in Logseq, featuring both TUI and external editor support.
 
 ## Features
-
-- Terminal User Interface (TUI) with real-time editing
 - External editor integration ($EDITOR by default)
+- Terminal User Interface (TUI) with real-time editing
 - Automatic journal file creation
 - Support for both Markdown and Org formats
 - Configurable file naming format
 - Customizable Logseq directory location
+
+### TUI Specific Features
+- File search functionality with prefix matching
+- TODO & priority cycling through keyboard shortcuts
+- Line indentation & unindentation
+- Auto-save when switching files through search
 
 ## Installation
 
@@ -41,9 +46,17 @@ This opens today's journal in your default editor ($EDITOR environment variable)
 - `Ctrl+C`: Quit
 - `Ctrl+T`: Cycle through TODO states on current line
 - `Ctrl+P`: Cycle through priority states on current line
+- `Ctrl+F`: Open search modal
 - `tab`: Indent the entire line from anywhere on the line.
 - `shift+tab`: Unindent the line from anywhere on te line.
 - Arrow keys: Navigate through text
+
+## Search Modal Controls
+
+- Type to search through files
+- `↑/↓`: Navigate through results
+- `Enter`: Open selected file (current files saves on open)
+- `Esc`: Close search modal
 
 ## Configuration
 
