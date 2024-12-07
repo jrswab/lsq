@@ -2,6 +2,7 @@ package trie
 
 import (
 	"strings"
+	"unicode"
 )
 
 // Node represents a single character in the trie.
@@ -12,6 +13,7 @@ type Node struct {
 	Char        string
 	Children    [26]*Node
 	IsEndOfWord bool
+	fileName string
 }
 
 // NewNode is used to initialize a new node with it's 26 children
@@ -40,10 +42,10 @@ func NewTrie() *Trie {
 }
 
 // Insert inserts a word to the trie.
-func (t *Trie) Insert(word string) error {
+func (t *Trie) Insert(fileName string) error {
 	var (
 		current      = t.RootNode
-		strippedWord = removeNonAlpha(word)
+		strippedWord = removeNonAlpha(fileName)
 	)
 
 	for i := 0; i < len(strippedWord); i++ {
@@ -64,6 +66,7 @@ func (t *Trie) Insert(word string) error {
 
 	// Mark this as end of the word to help avoid false positives.
 	current.IsEndOfWord = true
+	current.fileName = fileName
 
 	return nil
 }
@@ -74,17 +77,12 @@ func removeNonAlpha(fileName string) string {
 	s = strings.ReplaceAll(s, ".md", "")
 	s = strings.ReplaceAll(s, ".org", "")
 
-	// Single word pages/tags will not trigger these:
-	s = strings.ReplaceAll(s, " ", "")
-	s = strings.ReplaceAll(s, "-", "")
-	s = strings.ReplaceAll(s, "_", "")
-	s = strings.ReplaceAll(s, "'", "")
-	s = strings.ReplaceAll(s, ":", "")
-	s = strings.ReplaceAll(s, ";", "")
-	s = strings.ReplaceAll(s, ".", "")
-	s = strings.ReplaceAll(s, "\"", "")
-
-	return s
+	return strings.Map(func(r rune) rune {
+        if unicode.IsLetter(r) {
+            return r
+        }
+        return -1  // -1 tells strings.Map to remove this rune
+    }, s)
 }
 
 // SearchWord will return false if the word is not in the trie

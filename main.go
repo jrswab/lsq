@@ -10,12 +10,32 @@ import (
 
 	"github.com/jrswab/lsq/config"
 	"github.com/jrswab/lsq/system"
+	"github.com/jrswab/lsq/trie"
 	"github.com/jrswab/lsq/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func initTrie(path string) (*trie.Trie, error) {
+	var tree = *trie.NewTrie()
+
+	// get list of all files in ~/Logseq/Pages
+	fileList, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range fileList {
+		if !fileList[i].IsDir() {
+			tree.Insert(fileList[i].Name())
+		}
+	}
+
+	return &tree, nil
+}
+
 func main() {
+
 	// Define command line flags
 	useTUI := flag.Bool("t", false, "Use the custom TUI instead of directly opening the system editor")
 	lsqDirName := flag.String("d", "Logseq", "The main Logseq directory to use.")
@@ -37,6 +57,13 @@ func main() {
 	lsqDir := filepath.Join(homeDir, *lsqDirName)
 	lsqCfgDir := filepath.Join(lsqDir, *lsqCfgDirName)
 	cfgFile := filepath.Join(lsqCfgDir, *lsqCfgFileName)
+
+	// Init Search
+	_, err = initTrie(filepath.Join(lsqDir, "pages"))
+	if err != nil {
+		log.Printf("error loading pages directory for search: %v\n", err)
+		os.Exit(1)
+	}
 
 	cfg, err := system.LoadConfig(cfgFile)
 	if err != nil {
