@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 
 	"github.com/jrswab/lsq/config"
+	"github.com/jrswab/lsq/trie"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // New search state struct
@@ -34,9 +36,10 @@ type tuiModel struct {
 	filepath  string
 	statusMsg string
 	search    searchState
+	trie      *trie.Trie
 }
 
-func InitialModel(cfg *config.Config, fp string) tuiModel {
+func InitialModel(cfg *config.Config, fp string, t *trie.Trie) tuiModel {
 	// Read file content for TUI
 	content, err := os.ReadFile(fp)
 	if err != nil {
@@ -53,6 +56,7 @@ func InitialModel(cfg *config.Config, fp string) tuiModel {
 		textarea: ta,
 		config:   cfg,
 		filepath: fp,
+		trie:     t,
 	}
 }
 
@@ -83,16 +87,29 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m tuiModel) View() string {
-	var footer = "^S save, ^C quit"
+	var footer = "^S save, ^C quit, ^F search"
 
 	if m.statusMsg != "" {
 		footer = m.statusMsg
 	}
 
-	return fmt.Sprintf(
+	baseView := fmt.Sprintf(
 		"LSQ TUI - %s\n%s\n%s",
 		filepath.Base(m.filepath),
 		m.textarea.View(),
 		footer,
 	)
+
+	if m.search.active {
+		// Center the modal
+		return lipgloss.Place(
+			m.textarea.Width(),
+			m.textarea.Height(),
+			lipgloss.Center,
+			lipgloss.Center,
+			m.searchModalView(),
+		)
+	}
+
+	return baseView
 }

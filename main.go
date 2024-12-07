@@ -59,7 +59,7 @@ func main() {
 	cfgFile := filepath.Join(lsqCfgDir, *lsqCfgFileName)
 
 	// Init Search
-	_, err = initTrie(filepath.Join(lsqDir, "pages"))
+	searchTrie, err := initTrie(filepath.Join(lsqDir, "pages"))
 	if err != nil {
 		log.Printf("error loading pages directory for search: %v\n", err)
 		os.Exit(1)
@@ -101,7 +101,7 @@ func main() {
 
 	// After the file exists, branch based on mode
 	if *useTUI {
-		loadTui(cfg, journalPath)
+		loadTui(cfg, journalPath, searchTrie)
 	} else {
 		loadEditor(*editorType, journalPath)
 	}
@@ -109,9 +109,9 @@ func main() {
 	os.Exit(0)
 }
 
-func loadTui(cfg *config.Config, path string) {
+func loadTui(cfg *config.Config, path string, t *trie.Trie) {
 	p := tea.NewProgram(
-		tui.InitialModel(cfg, path),
+		tui.InitialModel(cfg, path, t),
 		tea.WithAltScreen(),
 	)
 

@@ -13,7 +13,7 @@ type Node struct {
 	Char        string
 	Children    [26]*Node
 	IsEndOfWord bool
-	fileName string
+	fileName    string
 }
 
 // NewNode is used to initialize a new node with it's 26 children
@@ -78,11 +78,11 @@ func removeNonAlpha(fileName string) string {
 	s = strings.ReplaceAll(s, ".org", "")
 
 	return strings.Map(func(r rune) rune {
-        if unicode.IsLetter(r) {
-            return r
-        }
-        return -1  // -1 tells strings.Map to remove this rune
-    }, s)
+		if unicode.IsLetter(r) {
+			return r
+		}
+		return -1 // -1 tells strings.Map to remove this rune
+	}, s)
 }
 
 // SearchWord will return false if the word is not in the trie
@@ -111,4 +111,46 @@ func (t *Trie) SearchWord(word string) bool {
 
 	// Only return as found if it's an indexed word
 	return current.IsEndOfWord
+}
+
+func (t *Trie) Search(prefix string) []string {
+	var (
+		results []string
+		current = t.RootNode
+	)
+
+	strippedPrefix := removeNonAlpha(prefix)
+
+	// Navigate to prefix node
+	for i := 0; i < len(strippedPrefix); i++ {
+		index := strippedPrefix[i] - 'a'
+
+		if current == nil || current.Children[index] == nil {
+			return results
+		}
+
+		current = current.Children[index]
+	}
+
+	// Get all files under this node
+	collectFiles(current, &results)
+
+	return results
+}
+
+func collectFiles(node *Node, results *[]string) {
+	if node == nil {
+		return
+	}
+
+	if node.IsEndOfWord {
+		*results = append(*results, node.fileName)
+	}
+
+	// Check all children
+	for _, child := range node.Children {
+		if child != nil {
+			collectFiles(child, results)
+		}
+	}
 }
