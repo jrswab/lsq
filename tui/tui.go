@@ -4,25 +4,42 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/jrswab/lsq/config"
-	"github.com/jrswab/lsq/editor"
-	"github.com/jrswab/lsq/todo"
+	"github.com/jrswab/lsq/trie"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
+// New search state struct
+type searchState struct {
+	active        bool
+	query         string
+	results       []string
+	selectedIndex int
+}
+
+// Message types for search operations
+type searchToggleMsg struct{}
+type searchUpdateMsg struct {
+	query string
+}
+type searchSelectMsg struct {
+	index int
+}
+
 type tuiModel struct {
-	//viewport viewport.Model
 	textarea  textarea.Model
 	config    *config.Config
 	filepath  string
 	statusMsg string
+	search    searchState
+	trie      *trie.Trie
 }
 
-func InitialModel(cfg *config.Config, fp string) tuiModel {
+func InitialModel(cfg *config.Config, fp string, t *trie.Trie) tuiModel {
 	// Read file content for TUI
 	content, err := os.ReadFile(fp)
 	if err != nil {
@@ -39,6 +56,7 @@ func InitialModel(cfg *config.Config, fp string) tuiModel {
 		textarea: ta,
 		config:   cfg,
 		filepath: fp,
+		trie:     t,
 	}
 }
 
@@ -57,38 +75,7 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC:
-			return m, tea.Quit
-
-		case tea.KeyCtrlS:
-			content := m.textarea.Value()
-			err := os.WriteFile(m.filepath, []byte(content), 0644)
-			if err != nil {
-				m.statusMsg = "Error saving file!"
-				return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-					return statusMsg{}
-				})
-			}
-
-			m.statusMsg = "File saved successfully!"
-			return m, tea.Tick(time.Second*2, func(t time.Time) tea.Msg {
-				return statusMsg{}
-			})
-
-		case tea.KeyTab:
-			manipulateText(&m, editor.AddTab)
-
-		case tea.KeyShiftTab:
-			manipulateText(&m, editor.RemoveTab)
-
-		// Cycle through TODO states:
-		case tea.KeyCtrlT:
-			manipulateText(&m, todo.CycleState)
-
-		case tea.KeyCtrlP:
-			manipulateText(&m, todo.CyclePriority)
-		}
+		return m.key(msg)
 
 	case tea.WindowSizeMsg:
 		m.textarea.SetWidth(msg.Width - 2)
@@ -100,16 +87,29 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m tuiModel) View() string {
-	var footer = "^S save, ^C quit"
+	var footer = "^S save, ^C quit, ^F search"
 
 	if m.statusMsg != "" {
 		footer = m.statusMsg
 	}
 
-	return fmt.Sprintf(
+	baseView := fmt.Sprintf(
 		"LSQ TUI - %s\n%s\n%s",
 		filepath.Base(m.filepath),
 		m.textarea.View(),
 		footer,
 	)
+
+	if m.search.active {
+		// Center the modal
+		return lipgloss.Place(
+			m.textarea.Width(),
+			m.textarea.Height(),
+			lipgloss.Center,
+			lipgloss.Center,
+			m.searchModalView(),
+		)
+	}
+
+	return baseView
 }
