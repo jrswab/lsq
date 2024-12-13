@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0]
+### Added
+- Search for page aliases
+
 ## [0.5.0] - 2024-12-07
-## Added
+### Added
 - [Charmbracelet Lipgloss](https://github.com/charmbracelet/lipgloss) for modal positioning
 - Added search state structure to track search UI state
 - Implemented trie-based search functionality
@@ -17,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated footer to show search shortcut
 - Recursive file collection for prefix matches
 
-## Changed
+### Changed
 - Updated tuiModel to include search state
 
 ## [0.4.1] - 2024-12-04

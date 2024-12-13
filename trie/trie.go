@@ -1,6 +1,9 @@
 package trie
 
 import (
+	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -13,7 +16,8 @@ type Node struct {
 	Char        string
 	Children    [26]*Node
 	IsEndOfWord bool
-	fileName    string
+	IsAlias     bool
+	FileName    string
 }
 
 // NewNode is used to initialize a new node with it's 26 children
@@ -41,8 +45,65 @@ func NewTrie() *Trie {
 	return &Trie{RootNode: NewNode("\000")}
 }
 
+func Init(path string) (*Trie, error) {
+	var tree = NewTrie()
+
+	// get list of all files in ~/Logseq/Pages
+	fileList, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+
+	// Allocate enough space in case every page has an alias:
+	aliases := make(map[string]string, len(fileList))
+
+	// First pass: Process all files and collect aliases
+	for i := range fileList {
+		if !fileList[i].IsDir() {
+			tree.InsertFileName(fileList[i].Name())
+
+			// Get file contents:
+			content, err := os.ReadFile(filepath.Join(path, fileList[i].Name()))
+			if err != nil {
+				return nil, err
+			}
+
+			// Split into a slice of lines:
+			lines := strings.Split(string(content), "\n")
+
+			// Find the line containing "alias::"
+			for _, line := range lines {
+				if strings.Contains(line, "alias::") {
+
+					parts := strings.Split(line, "::")
+					if len(parts) != 2 {
+						continue
+					}
+
+					aliasList := strings.Split(parts[1], ",")
+
+					for _, alias := range aliasList {
+						trimmedAlias := strings.TrimSpace(alias)
+
+						if trimmedAlias != "" {
+							aliases[trimmedAlias] = fileList[i].Name()
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Second pass: Insert all collected aliases
+	for alias, fileName := range aliases {
+		tree.InsertAlias(alias, fileName)
+	}
+
+	return tree, nil
+}
+
 // Insert inserts a word to the trie.
-func (t *Trie) Insert(fileName string) error {
+func (t *Trie) InsertFileName(fileName string) {
 	var (
 		current      = t.RootNode
 		strippedWord = removeNonAlpha(fileName)
@@ -66,9 +127,39 @@ func (t *Trie) Insert(fileName string) error {
 
 	// Mark this as end of the word to help avoid false positives.
 	current.IsEndOfWord = true
-	current.fileName = fileName
+	current.FileName = fileName
 
-	return nil
+	return
+}
+
+func (t *Trie) InsertAlias(alias, fileName string) {
+	var (
+		current      = t.RootNode
+		strippedWord = removeNonAlpha(alias)
+	)
+
+	for i := 0; i < len(strippedWord); i++ {
+		// a is decimal number 97
+		// b is decimal number 98
+		// and so on....
+		// 98-97=1 so the index of b is 1
+		index := strippedWord[i] - 'a'
+
+		// Check if the current node has a child node created for this letter (ascii digit)
+		// if not create the node:
+		if current.Children[index] == nil {
+			current.Children[index] = NewNode(string(strippedWord[i]))
+		}
+
+		current = current.Children[index]
+	}
+
+	// Mark this as end of the word to help avoid false positives.
+	current.IsEndOfWord = true
+	current.FileName = fileName
+	current.IsAlias = true
+
+	return
 }
 
 func removeNonAlpha(fileName string) string {
@@ -85,72 +176,48 @@ func removeNonAlpha(fileName string) string {
 	}, s)
 }
 
-// SearchWord will return false if the word is not in the trie
-// and true if it is in th trie.
-func (t *Trie) SearchWord(word string) bool {
-	var (
-		strippedWord = removeNonAlpha(word)
-		current      = t.RootNode
-	)
-
-	for i := 0; i < len(strippedWord); i++ {
-		index := strippedWord[i] - 'a'
-
-		// When nil this is the last node and this word is not indexed in the trie
-		if current == nil {
-			return false
-		}
-
-		if current.Children[index] == nil {
-			return false
-		}
-
-		// Move to the next node
-		current = current.Children[index]
-	}
-
-	// Only return as found if it's an indexed word
-	return current.IsEndOfWord
-}
-
 func (t *Trie) Search(prefix string) []string {
-	var (
-		results []string
-		current = t.RootNode
-	)
+	results := make(map[string]struct{}) // Use map for deduplication
+	current := t.RootNode
 
 	strippedPrefix := removeNonAlpha(prefix)
 
 	// Navigate to prefix node
 	for i := 0; i < len(strippedPrefix); i++ {
 		index := strippedPrefix[i] - 'a'
-
 		if current == nil || current.Children[index] == nil {
-			return results
+			return nil
 		}
-
 		current = current.Children[index]
 	}
 
-	// Get all files under this node
-	collectFiles(current, &results)
+	// Use map for collection
+	collectFilesUnique(current, results)
 
-	return results
+	// Convert map keys to slice
+	uniqueResults := make([]string, 0, len(results))
+	for fileName := range results {
+		uniqueResults = append(uniqueResults, fileName)
+	}
+
+	// Sort results for consistent ordering
+	sort.Strings(uniqueResults)
+
+	return uniqueResults
 }
 
-func collectFiles(node *Node, results *[]string) {
+func collectFilesUnique(node *Node, results map[string]struct{}) {
 	if node == nil {
 		return
 	}
 
 	if node.IsEndOfWord {
-		*results = append(*results, node.fileName)
+		results[node.FileName] = struct{}{}
 	}
 
-	// Check all children
 	for _, child := range node.Children {
 		if child != nil {
-			collectFiles(child, results)
+			collectFilesUnique(child, results)
 		}
 	}
 }

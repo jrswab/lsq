@@ -16,24 +16,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func initTrie(path string) (*trie.Trie, error) {
-	var tree = *trie.NewTrie()
-
-	// get list of all files in ~/Logseq/Pages
-	fileList, err := os.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range fileList {
-		if !fileList[i].IsDir() {
-			tree.Insert(fileList[i].Name())
-		}
-	}
-
-	return &tree, nil
-}
-
 func main() {
 
 	// Define command line flags
@@ -59,7 +41,7 @@ func main() {
 	cfgFile := filepath.Join(lsqCfgDir, *lsqCfgFileName)
 
 	// Init Search
-	searchTrie, err := initTrie(filepath.Join(lsqDir, "pages"))
+	searchTrie, err := trie.Init(filepath.Join(lsqDir, "pages"))
 	if err != nil {
 		log.Printf("error loading pages directory for search: %v\n", err)
 		os.Exit(1)
