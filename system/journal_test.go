@@ -1,4 +1,4 @@
-package system
+package system_test
 
 import (
 	"os"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jrswab/lsq/config"
+	"github.com/jrswab/lsq/system"
 	i "github.com/jrswab/lsq/tests/integration"
 )
 
@@ -93,7 +94,7 @@ func TestBasicJournalCreation(t *testing.T) {
 				}
 			}
 
-			cfg, err := LoadConfig(tc.helper.ConfigPath)
+			cfg, err := system.LoadConfig(tc.helper.ConfigPath)
 			if err != nil {
 				t.Fatalf("Failed to load config file: %v", err)
 			}
@@ -114,7 +115,7 @@ func TestBasicJournalCreation(t *testing.T) {
 			}
 
 			// Get journal path and create the journal entry if needed
-			expectedPath, err := GetJournal(cfg, helper.JournalsDir, date)
+			expectedPath, err := system.GetJournal(cfg, helper.JournalsDir, date)
 			if err != nil {
 				t.Fatalf("Failed to get journal file: %v", err)
 			}
@@ -135,3 +136,60 @@ func TestBasicJournalCreation(t *testing.T) {
 		})
 	}
 }
+
+func TestAppendToFile(t *testing.T) {
+    tmpDir, err := os.MkdirTemp("", "test")
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer os.RemoveAll(tmpDir)
+
+    t.Run("new file creation", func(t *testing.T) {
+        testFile := filepath.Join(tmpDir, "new.md")
+        if err := system.AppendToFile(testFile, "new content"); err != nil {
+            t.Errorf("Failed to create new file: %v", err)
+        }
+
+        content, err := os.ReadFile(testFile)
+        if err != nil {
+            t.Fatal(err)
+        }
+        expected := "- new content"
+        if string(content) != expected {
+            t.Errorf("Expected %q, got %q", expected, string(content))
+        }
+    })
+
+    t.Run("append to existing", func(t *testing.T) {
+        testFile := filepath.Join(tmpDir, "existing.md")
+        if err := system.AppendToFile(testFile, "first"); err != nil {
+            t.Fatal(err)
+        }
+        if err := system.AppendToFile(testFile, "second"); err != nil {
+            t.Errorf("Failed to append: %v", err)
+        }
+
+        content, err := os.ReadFile(testFile)
+        if err != nil {
+            t.Fatal(err)
+        }
+        expected := "- first\n- second"
+        if string(content) != expected {
+            t.Errorf("Expected %q, got %q", expected, string(content))
+        }
+    })
+
+    t.Run("permission denied", func(t *testing.T) {
+        readOnlyDir := filepath.Join(tmpDir, "readonly")
+        if err := os.Mkdir(readOnlyDir, 0500); err != nil {
+            t.Fatal(err)
+        }
+        
+        testFile := filepath.Join(readOnlyDir, "test.md")
+        err := system.AppendToFile(testFile, "content")
+        if err == nil {
+            t.Error("Expected error for read-only directory")
+        }
+    })
+}
+
