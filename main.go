@@ -25,6 +25,7 @@ func main() {
 	lsqCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
 	editorType := flag.String("e", "EDITOR", "The editor to use.")
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
+	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR or the TUI.")
 
 	// Parse flags
 	flag.Parse()
@@ -73,6 +74,14 @@ func main() {
 
 		// Return date formatted to user configuration.
 		date = parsedDate.Format(config.ConvertDateFormat(cfg.FileNameFmt))
+	}
+
+	if *apnd != "" {
+		path := system.CreateFilePath(cfg, journalsDir, date)
+		system.AppendToFile(path, *apnd)
+
+		// Don't open $EDITOR or TUI when append flag is used.
+		return
 	}
 
 	journalPath, err := system.GetJournal(cfg, journalsDir, date)
@@ -124,3 +133,4 @@ func loadEditor(editor, path string) {
 		os.Exit(1)
 	}
 }
+
