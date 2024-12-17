@@ -21,15 +21,6 @@ type searchState struct {
 	selectedIndex int
 }
 
-// Message types for search operations
-type searchToggleMsg struct{}
-type searchUpdateMsg struct {
-	query string
-}
-type searchSelectMsg struct {
-	index int
-}
-
 type tuiModel struct {
 	textarea  textarea.Model
 	config    *config.Config
