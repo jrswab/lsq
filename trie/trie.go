@@ -128,8 +128,6 @@ func (t *Trie) InsertFileName(fileName string) {
 	// Mark this as end of the word to help avoid false positives.
 	current.IsEndOfWord = true
 	current.FileName = fileName
-
-	return
 }
 
 func (t *Trie) InsertAlias(alias, fileName string) {
@@ -158,8 +156,6 @@ func (t *Trie) InsertAlias(alias, fileName string) {
 	current.IsEndOfWord = true
 	current.FileName = fileName
 	current.IsAlias = true
-
-	return
 }
 
 func removeNonAlpha(fileName string) string {
