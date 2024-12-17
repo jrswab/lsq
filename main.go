@@ -78,7 +78,11 @@ func main() {
 
 	if *apnd != "" {
 		path := system.CreateFilePath(cfg, journalsDir, date)
-		system.AppendToFile(path, *apnd)
+		err := system.AppendToFile(path, *apnd)
+		if err != nil {
+			log.Printf("Error appending data to file: %v\n", err)
+			os.Exit(1)
+		}
 
 		// Don't open $EDITOR or TUI when append flag is used.
 		return
