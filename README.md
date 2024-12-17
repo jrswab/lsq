@@ -33,6 +33,7 @@ This opens today's journal in your default editor ($EDITOR environment variable)
 
 ### Command Line Options
 
+- `-a`: Append text directly to the current journal page
 - `-c`: Specify config filename. (default: "config.edn")
 - `-d`: Specify Logseq directory name. (default: "Logseq")
 - `-e`: Set editor environment variable. (default: "$EDITOR")
@@ -69,6 +70,7 @@ LSQ reads your Logseq configuration from `config.edn`. Supported settings:
 ## Dependencies
 
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea): Terminal UI framework
+- [Lipgloss](https://github.com/charmbracelet/lipgloss): Terminal UI styling
 - [EDN](https://olympos.io/encoding/edn): Configuration file parsing
 
 ## Contributing
