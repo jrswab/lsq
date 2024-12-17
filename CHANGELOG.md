@@ -6,10 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.7.0] - 2024-12-16
 ### Added
 - Added "-a" flag to append text directly to the current journal page.
+- Added linting to to Github Actions workflow
 
-## [0.6.0]
+### Changed
+- Github Actions workflow structure into divided parts.
+
+## [0.6.0] - 2024-12-14
 ### Added
 - Search for page aliases
 
