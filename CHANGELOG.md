@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2024-12-18
+### Added
+- Search and list results for cli (`-f`)
+- Open first search result automatically from cli to $EDITOR (`-o`)
+
 ## [0.7.0] - 2024-12-16
 ### Added
 - Added "-a" flag to append text directly to the current journal page.
