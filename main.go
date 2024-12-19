@@ -2,10 +2,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jrswab/lsq/config"
@@ -19,13 +21,15 @@ import (
 func main() {
 
 	// Define command line flags
-	useTUI := flag.Bool("t", false, "Use the custom TUI instead of directly opening the system editor")
-	lsqDirName := flag.String("d", "Logseq", "The main Logseq directory to use.")
-	lsqCfgDirName := flag.String("l", "logseq", "The Logseq configuration directory to use.")
-	lsqCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
-	editorType := flag.String("e", "EDITOR", "The editor to use.")
-	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR or the TUI.")
+	lsqCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
+	lsqDirName := flag.String("d", "Logseq", "The main Logseq directory to use.")
+	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
+	cliSearch := flag.String("f", "", "Search the logseq graph without the TUI")
+	lsqCfgDirName := flag.String("l", "logseq", "The Logseq configuration directory to use.")
+	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
+	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
+	useTUI := flag.Bool("t", false, "Use the custom TUI instead of directly opening the system editor")
 
 	// Parse flags
 	flag.Parse()
@@ -40,12 +44,36 @@ func main() {
 	lsqDir := filepath.Join(homeDir, *lsqDirName)
 	lsqCfgDir := filepath.Join(lsqDir, *lsqCfgDirName)
 	cfgFile := filepath.Join(lsqCfgDir, *lsqCfgFileName)
+	pagesPath := filepath.Join(lsqDir, "pages")
 
-	// Init Search
-	searchTrie, err := trie.Init(filepath.Join(lsqDir, "pages"))
-	if err != nil {
-		log.Printf("error loading pages directory for search: %v\n", err)
-		os.Exit(1)
+	// Init Search only when TUI or -f is passed
+	var searchTrie *trie.Trie
+	if *useTUI || !strings.EqualFold(*cliSearch, "") {
+		searchTrie, err = trie.Init(pagesPath)
+		if err != nil {
+			log.Printf("error loading pages directory for search: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	if !strings.EqualFold(*cliSearch, ""){
+		results := searchTrie.Search(*cliSearch)
+		if len(results) < 1 {
+			fmt.Println("No results found")
+			return
+		}
+		
+		if *openFirstResult {
+			loadEditor(*editorType, fmt.Sprintf("%s/%s", pagesPath, results[0]))
+			return
+		}
+
+		fmt.Fprintf(os.Stdout, "Search Results:\n")
+		for _, val := range results {
+			fmt.Println(val)
+		}
+
+		return
 	}
 
 	cfg, err := system.LoadConfig(cfgFile)
@@ -100,8 +128,6 @@ func main() {
 	} else {
 		loadEditor(*editorType, journalPath)
 	}
-
-	os.Exit(0)
 }
 
 func loadTui(cfg *config.Config, path string, t *trie.Trie) {
@@ -118,7 +144,11 @@ func loadTui(cfg *config.Config, path string, t *trie.Trie) {
 
 func loadEditor(editor, path string) {
 	// Get editor from environment
-	editor = os.Getenv(editor)
+	if editor == "" {
+		editor = os.Getenv("EDITOR")
+		log.Println(editor)
+	}
+
 	// if still blank, use nano
 	if editor == "" {
 		log.Println("$EDITOR is blank, using Nano.")
