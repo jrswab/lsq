@@ -34,7 +34,7 @@ func LoadEditor(editor, path string) {
 	// if still blank, use nano
 	if editor == "" {
 		log.Println("$EDITOR is blank, using Nano.")
-		editor = "nano"
+		editor = "vim"
 	}
 
 	// Open file in editor
