@@ -30,6 +30,7 @@ lsq
 ```
 
 This opens today's journal in your default editor ($EDITOR environment variable).
+If no editor is defined in $EDITOR then `Vim` is will be used.
 
 ### Command Line Options
 
@@ -40,6 +41,7 @@ This opens today's journal in your default editor ($EDITOR environment variable)
 - `-f`: Search pages and aliases. Must be followed by a string.
 - `-l`: Specify Logseq config directory name. (default: "logseq")
 - `-o`: Automatically open the first result from the search.
+- `-p`: Open a specific page from the Logseq pages directory.
 - `-s`: Specify the journal date to open. (Must be `yyy-MM-dd` formatted)
 - `-t`: Use the built-in TUI instead of external editor.
 

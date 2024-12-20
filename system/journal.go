@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"time"
 	"path/filepath"
 
 	"github.com/jrswab/lsq/config"
@@ -22,7 +23,19 @@ func CreateFilePath(cfg *config.Config, journalsDir, date string) string {
 	return filepath.Join(journalsDir, fmt.Sprintf("%s%s", date, extension))
 }
 
-func GetJournal(cfg *config.Config, journalsDir, date string) (string, error) {
+func GetJournal(cfg *config.Config, journalsDir, specDate string) (string, error) {
+	date := time.Now().Format(config.ConvertDateFormat(cfg.FileNameFmt))
+
+	if specDate != "" {
+		parsedDate, err := time.Parse("2006-01-02", specDate)
+		if err != nil {
+			return "", fmt.Errorf("Error parsing date from -s flag: %v\n", err)
+		}
+
+		// Return date formatted to user configuration.
+		date = parsedDate.Format(config.ConvertDateFormat(cfg.FileNameFmt))
+	}
+
 	path := CreateFilePath(cfg, journalsDir, date)
 
 	// Create file if it doesn't exist

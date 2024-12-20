@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2024-12-19
+### Added
+- Open pages with -p in the default editor.
+
+### Changed
+- Refactored the `main.go` file.
+- Vim is now the default editor when $EDITOR is undefined and TUI is not used.
+
 ## [0.8.0] - 2024-12-18
 ### Added
 - Search and list results for cli (`-f`)
