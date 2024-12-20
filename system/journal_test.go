@@ -16,56 +16,56 @@ func TestBasicJournalCreation(t *testing.T) {
 	// Set up test cases with different dates
 	testCases := map[string]struct {
 		helper    *i.TestHelper
-		date      time.Time
+		date string
 		content   string
 		format    string // "Markdown" or "Org"
 		setupFunc func(h *i.TestHelper)
 	}{
 		"New Journal": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Now(),
+			date:    time.Now().Format("2006-01-02"),
 			content: "",
 			format:  "Markdown",
 		},
 		"Empty Format Preference": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Now(),
+			date:    time.Now().Format("2006-01-02"),
 			content: "",
 			format:  "", // Should default to Markdown
 		},
 		"Todays Journal With Data": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Now(),
+			date:    time.Now().Format("2006-01-02"),
 			content: "Test entry for today's date.",
 			format:  "Markdown",
 		},
 		"Opening a Past Journal": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Date(2024, 11, 28, 0, 0, 0, 0, time.UTC),
+			date:    time.Now().AddDate(0, 0, -1).Format("2006-01-02"), // Yesterday
 			content: "Test entry for specific date.",
 			format:  "Markdown",
 		},
 		"Future Date": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Now().AddDate(0, 0, 1), // Tomorrow
+			date:    time.Now().AddDate(0, 0, 1).Format("2006-01-02"), // Tomorrow
 			content: "",
 			format:  "Markdown",
 		},
 		"Far Past Date": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Date(1999, 12, 31, 0, 0, 0, 0, time.UTC),
+			date: "1999-12-31",
 			content: "",
 			format:  "Markdown",
 		},
 		"Unicode Content": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Now(),
+			date:    time.Now().Format("2006-01-02"),
 			content: "测试 Test テスト",
 			format:  "Markdown",
 		},
 		"Large Content": {
 			helper:  i.NewTestHelper(t),
-			date:    time.Now(),
+			date:    time.Now().Format("2006-01-02"),
 			content: strings.Repeat("Large content test ", 1000),
 			format:  "Markdown",
 		},
@@ -99,23 +99,28 @@ func TestBasicJournalCreation(t *testing.T) {
 				t.Fatalf("Failed to load config file: %v", err)
 			}
 
-			var date = tc.date.Format(config.ConvertDateFormat(cfg.FileNameFmt))
-
+			// Simualte existing journal entries
 			if tc.content != "" {
+				time, err := time.Parse("2006-01-02", tc.date)
+				if err != nil {
+					t.Fatal("failed to parse date string", err)
+				}
+
+				date := time.Format(config.ConvertDateFormat(cfg.FileNameFmt))
 				existingPath := filepath.Join(helper.JournalsDir, date+".md")
 				if tc.format != "Markdown" {
 					existingPath = filepath.Join(helper.JournalsDir, date+".org")
 				}
 
 				// Create the journal file to simulate existing data
-				err := os.WriteFile(existingPath, []byte(tc.content), 0644)
+				err = os.WriteFile(existingPath, []byte(tc.content), 0644)
 				if err != nil {
 					t.Fatalf("Failed to update config: %v", err)
 				}
 			}
 
 			// Get journal path and create the journal entry if needed
-			expectedPath, err := system.GetJournal(cfg, helper.JournalsDir, date)
+			expectedPath, err := system.GetJournal(cfg, helper.JournalsDir, tc.date)
 			if err != nil {
 				t.Fatalf("Failed to get journal file: %v", err)
 			}
