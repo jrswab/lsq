@@ -37,7 +37,7 @@ If no editor is defined in $EDITOR then `Vim` is will be used.
 - `-a`: Append text directly to the current journal page
 - `-c`: Specify config filename. (default: "config.edn")
 - `-d`: Specify Logseq directory name. (default: "Logseq")
-- `-e`: Set editor environment variable. (default: "$EDITOR")
+- `-e`: Set editor to use while editing files. (If the flag is not provided `$EDITOR` is used. If `$EDITOR` is not set, Vim is used.)
 - `-f`: Search pages and aliases. Must be followed by a string.
 - `-l`: Specify Logseq config directory name. (default: "logseq")
 - `-o`: Automatically open the first result from the search.
