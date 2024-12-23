@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - README to reflect TUI deprecation
+- How the `d` flag operates. The full path must be specified when using this flag. Example: "~/Documents/Notes"
+- `CONTRIBUTIONS.md` to be `CONTRIBUTING.md`
+- `README.md`
 
 ## [0.9.0] - 2024-12-19
 ### Added
