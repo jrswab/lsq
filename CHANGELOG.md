@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed
+- How the `d` flag operates. The full path must be specified when using this flag. Example: "~/Documents/Notes"
+- `CONTRIBUTIONS.md` to be `CONTRIBUTING.md`
+- `README.md`
 
 ## [0.9.0] - 2024-12-19
 ### Added

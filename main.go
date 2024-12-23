@@ -17,7 +17,7 @@ func main() {
 	// Define command line flags
 	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR or the TUI.")
 	lsqCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
-	lsqDirName := flag.String("d", "Logseq", "The main Logseq directory to use.")
+	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
 	cliSearch := flag.String("f", "", "Search the logseq graph without the TUI")
 	lsqCfgDirName := flag.String("l", "logseq", "The Logseq configuration directory to use.")
@@ -36,11 +36,17 @@ func main() {
 	}
 
 	// Construct paths
-	lsqDir := filepath.Join(homeDir, *lsqDirName)
-	lsqCfgDir := filepath.Join(lsqDir, *lsqCfgDirName)
+	lsqPath := filepath.Join(homeDir, "Logseq")
+
+	// When this flag is used replace path
+	if *lsqDirPath != "" {
+		lsqPath = *lsqDirPath
+	}
+
+	lsqCfgDir := filepath.Join(lsqPath, *lsqCfgDirName)
 	cfgFile := filepath.Join(lsqCfgDir, *lsqCfgFileName)
-	journalsDir := filepath.Join(lsqDir, "journals")
-	pagesDir := filepath.Join(lsqDir, "pages")
+	journalsDir := filepath.Join(lsqPath, "journals")
+	pagesDir := filepath.Join(lsqPath, "pages")
 
 	cfg, err := system.LoadConfig(cfgFile)
 	if err != nil {
