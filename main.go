@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jrswab/lsq/config"
 	"github.com/jrswab/lsq/system"
 	"github.com/jrswab/lsq/trie"
 )
@@ -44,11 +45,12 @@ func main() {
 	}
 
 	lsqCfgDir := filepath.Join(lsqPath, *lsqCfgDirName)
-	cfgFile := filepath.Join(lsqCfgDir, *lsqCfgFileName)
+	appCfgPath := filepath.Join(lsqCfgDir, *lsqCfgFileName)
 	journalsDir := filepath.Join(lsqPath, "journals")
 	pagesDir := filepath.Join(lsqPath, "pages")
 
-	cfg, err := system.LoadConfig(cfgFile)
+	cfg := &config.Config{}
+	err = cfg.Load(appCfgPath)
 	if err != nil {
 		log.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
@@ -76,7 +78,7 @@ func main() {
 			fmt.Println("No results found")
 			return
 		}
-		
+
 		if *openFirstResult {
 			system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", pagesDir, results[0]))
 			return
@@ -122,5 +124,3 @@ func main() {
 
 	system.LoadEditor(*editorType, journalPath)
 }
-
-
