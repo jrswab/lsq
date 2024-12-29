@@ -43,25 +43,28 @@ If no editor is defined in $EDITOR then `Vim` is will be used.
 - `-o`: Automatically open the first result from the search.
 - `-p`: Open a specific page from the Logseq pages directory.
 - `-s`: Specify the journal date to open. (Must be `yyy-MM-dd` formatted)
-- `-t`: Use the built-in TUI instead of external editor.
+~~- `-t`: Use the built-in TUI instead of external editor.~~
 
-## TUI Controls
+## TUI (Deprecated)
+As lsq moves toward v1.0.0, I've decided to focus on perfecting the core CLI experience. The TUI interface is now deprecated in favor of enhanced external editor integration and improved command-line workflows. This aligns with the project goal of providing the fastest, most reliable journaling experience possible. While the TUI was fast and operated well, it's outside of the current scope of this project. However, this does not mean that TUI is gone forever and if the community wants a TUI after v1.0.0 is released, I'd be happy to work on it again.
 
-- `Ctrl+S`: Save current file
-- `Ctrl+C`: Quit
-- `Ctrl+T`: Cycle through TODO states on current line
-- `Ctrl+P`: Cycle through priority states on current line
-- `Ctrl+F`: Open search modal
-- `tab`: Indent the entire line from anywhere on the line.
-- `shift+tab`: Unindent the line from anywhere on te line.
-- Arrow keys: Navigate through text
+### TUI Controls (Deprecated)
 
-### Search Modal Controls
+~~- `Ctrl+S`: Save current file~~
+~~- `Ctrl+C`: Quit~~
+~~- `Ctrl+T`: Cycle through TODO states on current line~~
+~~- `Ctrl+P`: Cycle through priority states on current line~~
+~~- `Ctrl+F`: Open search modal~~
+~~- `tab`: Indent the entire line from anywhere on the line.~~
+~~- `shift+tab`: Unindent the line from anywhere on te line.~~
+~~- Arrow keys: Navigate through text~~
 
-- Type to search through files
-- `↑/↓`: Navigate through results
-- `Enter`: Open selected file (current files saves on open)
-- `Esc`: Close search modal
+### TUI Search Modal Controls (Deprecated)
+
+~~- Type to search through files~~
+~~- `↑/↓`: Navigate through results~~
+~~- `Enter`: Open selected file (current files saves on open)~~
+~~- `Esc`: Close search modal~~
 
 ## Configuration
 
