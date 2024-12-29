@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jrswab/lsq/validator"
 	"olympos.io/encoding/edn"
 )
 
@@ -16,107 +17,73 @@ type LogseqConfig struct {
 }
 
 type Config struct {
-	Version  int    `edn:"meta/version"`
-	FileType string `edn:"file/type"`
-	FileFmt  string `edn:"file/format"`
-	FilePath string `edn:"file/path"`
+	Version    int    `edn:"meta/version"`
+	FileType   string `edn:"file/type"`
+	FileFmt    string `edn:"file/format"`
+	DirPath    string `edn:"directory"`
+	AppCfgDir  string `edn:"app/cfg-path"`
+	AppCfgName string `edn:"app/cfg-name"`
 }
 
-func (c *Config) Write() error {
-	configHome := os.Getenv("XDG_CONFIG_HOME")
-	if configHome == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		configHome = filepath.Join(homeDir, ".config")
-	}
+func Load() (*Config, error) {
+	var c *Config
 
-	configPath := filepath.Join(configHome, "lsq", "config.edn")
-	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
-		return err
-	}
-
-	p, err := edn.Marshal(c)
+	configDir, err := os.UserConfigDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return os.WriteFile(configPath, p, 0644)
-}
-
-func (c *Config) Load(appPath string) error {
-	configHome := os.Getenv("XDG_CONFIG_HOME")
-	if configHome == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		configHome = filepath.Join(homeDir, ".config")
-	}
-
-	cfgPath := filepath.Join(configHome, "lsq", "config.edn")
-
-	_, err := os.Stat(cfgPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("error checking file path: %v\n", err)
-		}
-
-		// lsq config does not exist
-		// Load app config for defaults.
-		appCfg, err := loadAppConfig(appPath)
-		if err != nil {
-			return fmt.Errorf("error checking Logseq config path: %v\n", err)
-		}
-
-		c.FileFmt = appCfg.FileNameFmt
-		c.FileType = appCfg.PreferredFmt
-		c.FilePath = appPath
-		c.Version = 1
-
-		err = c.Write()
-		if err != nil {
-			return fmt.Errorf("error writing to lsq config file: %v\n", err)
-		}
-
-		return nil
-	}
+	cfgPath := filepath.Join(configDir, "lsq", "config.edn")
 
 	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return fmt.Errorf("error reading config file: %v\n", err)
+	if err != nil && !os.IsNotExist(err) {
+		// The user has a config file but we couldn't read it.
+		// Report the error instead of ignoring their configuration.
+		return nil, fmt.Errorf("error reading config file: %v\n", err)
+	}
+
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	if err := validator.New().ValidateFile(cfgPath); err != nil {
+		return nil, fmt.Errorf("error validating config file: %v\n", err)
 	}
 
 	err = edn.Unmarshal(data, c)
 	if err != nil {
-		return fmt.Errorf("error unmarshaling config file: %v\n", err)
+		return nil, fmt.Errorf("error unmarshaling config file: %v\n", err)
 	}
 
-	return nil
+	return c, nil
 }
 
-func loadAppConfig(cfgFile string) (*LogseqConfig, error) {
+func LoadAppConfig(dirPath, appCfg string) (*Config, error) {
 	// Set defaults before extracting data from config file:
-	cfg := &LogseqConfig{
+	logCfg := &LogseqConfig{
 		CfgVers:      1,
 		PreferredFmt: "Markdown",
 		FileNameFmt:  "yyyy_MM_dd",
 	}
 
 	// Read config file to determine preferred format
-	configData, err := os.ReadFile(cfgFile)
+	configData, err := os.ReadFile(appCfg)
 	if err != nil {
-		return cfg, fmt.Errorf("error reading config file: %v\n", err)
+		return nil, err
 	}
 
 	// Update cfg with config values
-	err = edn.Unmarshal(configData, &cfg)
+	err = edn.Unmarshal(configData, &logCfg)
 	if err != nil {
-		return cfg, fmt.Errorf("error unmarshaling config data:%v", err)
+		return nil, fmt.Errorf("error unmarshaling config data:%v", err)
 	}
 
-	return cfg, nil
+	return &Config{
+		FileFmt:  logCfg.FileNameFmt,
+		FileType: logCfg.PreferredFmt,
+		DirPath:  dirPath,
+		Version:  1,
+	}, nil
 }
 
 func ConvertDateFormat(cfgFileFormat string) string {

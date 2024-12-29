@@ -14,48 +14,77 @@ import (
 )
 
 func main() {
-
-	// Define command line flags
-	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR or the TUI.")
-	lsqCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
+	// File Path Overrides
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
+	appCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
+	appCfgDirName := flag.String("l", "logseq", "The Logseq configuration directory to use.")
+
+	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR or the TUI.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
 	cliSearch := flag.String("f", "", "Search the logseq graph without the TUI")
-	lsqCfgDirName := flag.String("l", "logseq", "The Logseq configuration directory to use.")
 	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
 	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extention.")
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 	useTUI := flag.Bool("t", false, "Use the custom TUI instead of directly opening the system editor")
 
-	// Parse flags
 	flag.Parse()
 
+	// Check for config file
+	// if file exists load it
+	// if file !exists load logseq config
+	// set flags as overrides after
+
+	// Consturct file paths:
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		log.Printf("Error getting home directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Construct paths
-	lsqPath := filepath.Join(homeDir, "Logseq")
+	// Default path:
+	dirPath := filepath.Join(homeDir, "Logseq")
 
 	// When this flag is used replace path
 	if *lsqDirPath != "" {
-		lsqPath = *lsqDirPath
+		dirPath = *lsqDirPath
 	}
 
-	lsqCfgDir := filepath.Join(lsqPath, *lsqCfgDirName)
-	appCfgPath := filepath.Join(lsqCfgDir, *lsqCfgFileName)
-	journalsDir := filepath.Join(lsqPath, "journals")
-	pagesDir := filepath.Join(lsqPath, "pages")
+	// Load Config:
+	//cfg := &config.Config{
+	//	AppCfgDir:  *appCfgDirName,
+	//	AppCfgName: *appCfgFileName,
+	//}
 
-	cfg := &config.Config{}
-	err = cfg.Load(appCfgPath)
-	if err != nil {
+	cfg, err := config.Load()
+	if err != nil && !os.IsNotExist(err) {
+		// The user has a config file but we couldn't read it.
+		// Report the error instead of ignoring their configuration.
 		log.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
 
+	// When this flag is used override the config.
+	dirPath = cfg.DirPath
+	if *lsqDirPath != "" {
+		dirPath = *lsqDirPath
+	}
+
+	// Load the logseq specific config when the lsq config is not present.
+	if os.IsNotExist(err) {
+		cfg, err = config.LoadAppConfig(dirPath,
+			filepath.Join(dirPath, fmt.Sprintf("%s/%s", *appCfgDirName, *appCfgFileName)),
+		)
+
+		if err != nil && !os.IsNotExist(err) {
+			log.Printf("Error loading configuration: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	journalsDir := filepath.Join(dirPath, "journals")
+	pagesDir := filepath.Join(dirPath, "pages")
+
+	// Open page in default editor if specified:
 	if *pageToOpen != "" {
 		// TUI can use search feature to find a page to open
 		system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", pagesDir, *pageToOpen))

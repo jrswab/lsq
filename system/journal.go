@@ -6,16 +6,16 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jrswab/lsq/config"
 )
 
 func CreateFilePath(cfg *config.Config, journalsDir, date string) string {
-
 	// Construct today's journal file path
-	var extension = ".md"
-	if cfg.FileType == "Org" {
+	extension := ".md"
+	if strings.EqualFold(cfg.FileType, "Org") {
 		extension = ".org"
 	}
 
