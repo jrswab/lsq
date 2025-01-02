@@ -42,7 +42,7 @@ If no editor is defined in $EDITOR then `Vim` is will be used.
 - `-o`: Automatically open the first result from the search.
 - `-p`: Open a specific page from the Logseq pages directory.
 - `-s`: Specify the journal date to open. (Must be `yyy-MM-dd` formatted)
-~~- `-t`: Use the built-in TUI instead of external editor.~~
+- ~~`-t`: Use the built-in TUI instead of external editor.~~
 
 ### Configuration File
 This file must be stored in your config directory as `lsq/config.edn`.
@@ -72,21 +72,21 @@ As lsq moves toward v1.0.0, I've decided to focus on perfecting the core CLI exp
 
 ### TUI Controls (Deprecated)
 
-~~- `Ctrl+S`: Save current file~~
-~~- `Ctrl+C`: Quit~~
-~~- `Ctrl+T`: Cycle through TODO states on current line~~
-~~- `Ctrl+P`: Cycle through priority states on current line~~
-~~- `Ctrl+F`: Open search modal~~
-~~- `tab`: Indent the entire line from anywhere on the line.~~
-~~- `shift+tab`: Unindent the line from anywhere on te line.~~
-~~- Arrow keys: Navigate through text~~
+- ~~`Ctrl+S`: Save current file~~
+- ~~`Ctrl+C`: Quit~~
+- ~~`Ctrl+T`: Cycle through TODO states on current line~~
+- ~~`Ctrl+P`: Cycle through priority states on current line~~
+- ~~`Ctrl+F`: Open search modal~~
+- ~~`tab`: Indent the entire line from anywhere on the line.~~
+- ~~`shift+tab`: Unindent the line from anywhere on te line.~~
+- ~~Arrow keys: Navigate through text~~
 
 ### TUI Search Modal Controls (Deprecated)
 
-~~- Type to search through files~~
-~~- `↑/↓`: Navigate through results~~
-~~- `Enter`: Open selected file (current files saves on open)~~
-~~- `Esc`: Close search modal~~
+- ~~Type to search through files~~
+- ~~`↑/↓`: Navigate through results~~
+- ~~`Enter`: Open selected file (current files saves on open)~~
+- ~~`Esc`: Close search modal~~
 
 ## Configuration
 
@@ -106,44 +106,7 @@ LSQ reads your Logseq configuration from `config.edn`. Supported settings:
 
 First off, thank you for considering contributing to lsq! 🎉
 
-### Ways to Contribute
-
-- Report bugs
-- Suggest new features
-- Improve documentation
-- Submit pull requests
-- Share how you use lsq
-- Star the project on GitHub
-
-### Development Setup
-
-1. Fork the repository
-2. Clone your fork:
-```bash
-git clone https://github.com/your-username/lsq.git
-```
-3. Add the upstream remote:
-```bash
-git remote add upstream https://github.com/jrswab/lsq.git
-```
-4. Create a branch for your work:
-```bash
-git checkout -b your-feature-branch
-```
-
-### Pull Request Process
-
-1. Update the README.md with details of any interface changes if applicable
-2. Keep PRs focused - one feature or fix per PR
-3. Use clear, descriptive commit messages
-4. Make sure your branch is up to date with main before submitting
-5. Include a clear description of the changes in your PR
-
-### First Time Contributors
-
-New to contributing? Look for issues tagged with `good-first-issue` or `documentation`. These are great starting points!
-
-See [CONTRIBUTORS.md](CONTRIBUTORS.md) for a list of project contributors.
+For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).
 
 ## License
 
