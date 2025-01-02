@@ -17,16 +17,18 @@ type LogseqConfig struct {
 }
 
 type Config struct {
-	Version    int    `edn:"meta/version"`
-	FileType   string `edn:"file/type"`
-	FileFmt    string `edn:"file/format"`
-	DirPath    string `edn:"directory"`
-	AppCfgDir  string `edn:"app/cfg-path"`
-	AppCfgName string `edn:"app/cfg-name"`
+	Version  int    `edn:"meta/version"`
+	FileType string `edn:"file/type"`
+	FileFmt  string `edn:"file/format"`
+
+	// Paths
+	DirPath     string `edn:"directory"`
+	JournalsDir string `edn:"journals/directory"`
+	PagesDir    string `edn:"pages/directory"`
 }
 
 func Load() (*Config, error) {
-	var c *Config
+	c := &Config{Version: 1}
 
 	configDir, err := os.UserConfigDir()
 	if err != nil {
@@ -35,15 +37,28 @@ func Load() (*Config, error) {
 
 	cfgPath := filepath.Join(configDir, "lsq", "config.edn")
 
-	data, err := os.ReadFile(cfgPath)
+	data, dErr := os.ReadFile(cfgPath)
 	if err != nil && !os.IsNotExist(err) {
 		// The user has a config file but we couldn't read it.
 		// Report the error instead of ignoring their configuration.
 		return nil, fmt.Errorf("error reading config file: %v\n", err)
 	}
 
-	if os.IsNotExist(err) {
-		return nil, nil
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	if os.IsNotExist(dErr) {
+		// Set a defaults in case the user did not provide an override
+		c.FileType = "Markdown"
+		c.FileFmt = "yyyy_MM_dd"
+
+		c.DirPath = filepath.Join(homeDir, "Logseq")
+		c.JournalsDir = filepath.Join(c.DirPath, "journals")
+		c.PagesDir = filepath.Join(c.DirPath, "pages")
+
+		return c, nil
 	}
 
 	if err := validator.New().ValidateFile(cfgPath); err != nil {
@@ -55,35 +70,24 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("error unmarshaling config file: %v\n", err)
 	}
 
+	// Check for missing data and use defaults
+	if c.DirPath == "" {
+		c.DirPath = homeDir
+	}
+
+	// Set Logseq default directories
+	c.JournalsDir = filepath.Join(c.DirPath, "journals")
+	c.PagesDir = filepath.Join(c.DirPath, "pages")
+
+	if c.FileType == "" {
+		c.FileType = "Markdown"
+	}
+
+	if c.FileFmt == "" {
+		c.FileFmt = "yyyy_MM_dd"
+	}
+
 	return c, nil
-}
-
-func LoadAppConfig(dirPath, appCfg string) (*Config, error) {
-	// Set defaults before extracting data from config file:
-	logCfg := &LogseqConfig{
-		CfgVers:      1,
-		PreferredFmt: "Markdown",
-		FileNameFmt:  "yyyy_MM_dd",
-	}
-
-	// Read config file to determine preferred format
-	configData, err := os.ReadFile(appCfg)
-	if err != nil {
-		return nil, err
-	}
-
-	// Update cfg with config values
-	err = edn.Unmarshal(configData, &logCfg)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling config data:%v", err)
-	}
-
-	return &Config{
-		FileFmt:  logCfg.FileNameFmt,
-		FileType: logCfg.PreferredFmt,
-		DirPath:  dirPath,
-		Version:  1,
-	}, nil
 }
 
 func ConvertDateFormat(cfgFileFormat string) string {

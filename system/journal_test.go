@@ -73,29 +73,10 @@ func TestBasicJournalCreation(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			var helper = tc.helper
+			helper := tc.helper
 			defer helper.Cleanup()
 
-			if tc.setupFunc != nil {
-				tc.setupFunc(helper)
-			}
-
-			// Update config if needed for the format
-			if tc.format != "Markdown" {
-				configContent := `{
-					:meta/version 1
-					:preferred-format "` + tc.format + `"
-					:journal/file-name-format "yyyy_MM_dd"
-				}`
-
-				err := os.WriteFile(tc.helper.ConfigPath, []byte(configContent), 0644)
-				if err != nil {
-					t.Fatalf("Failed to update config: %v", err)
-				}
-			}
-
-			cfg := &config.Config{}
-			err := cfg.Load(tc.helper.ConfigPath)
+			cfg, err := config.Load()
 			if err != nil {
 				t.Fatalf("Failed to load config file: %v", err)
 			}

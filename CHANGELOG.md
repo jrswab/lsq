@@ -6,14 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- lsq configuration file to set user defaults instead of using flags on every run.
+
 ### Deprecated
 - TUI
 
 ### Changed
 - README to reflect TUI deprecation
-- How the `d` flag operates. The full path must be specified when using this flag. Example: "~/Documents/Notes"
+- How the `d` flag operates. The full path must be specified when using this flag. Example: "/home/jaron/documents/notes"
+- No longer using the Logseq `config.edn` file.
 - `CONTRIBUTIONS.md` to be `CONTRIBUTING.md`
 - `README.md`
+
+### Removed
+- appCfgFileName (-c flag) since this is set by Logseq.
+- appCfgDirName (-l flag) since this is also set by Logseq.
 
 ## [0.9.0] - 2024-12-19
 ### Added

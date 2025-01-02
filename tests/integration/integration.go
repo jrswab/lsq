@@ -13,11 +13,14 @@ type TestHelper struct {
 	// Test directories
 	TempDir     string
 	LogseqDir   string
+	LogseqSetts string
 	JournalsDir string
-	ConfigPath  string
+	PagesDir    string
+	ConfigDir   string
 
 	// Original environment state
 	OriginalEditor string
+	OriginalConfig string
 	OriginalHome   string
 }
 
@@ -26,17 +29,18 @@ func NewTestHelper(t *testing.T) *TestHelper {
 	t.Helper()
 
 	tempDir := t.TempDir()
-	logseqDir := filepath.Join(tempDir, "Logseq")
-	journalsDir := filepath.Join(logseqDir, "journals")
 
 	helper := &TestHelper{
 		t:              t,
 		TempDir:        tempDir,
-		LogseqDir:      logseqDir,
-		JournalsDir:    journalsDir,
-		ConfigPath:     filepath.Join(logseqDir, "logseq", "config.edn"),
+		LogseqDir:      filepath.Join(tempDir, "Logseq"),
+		LogseqSetts:    filepath.Join(tempDir, "Logseq", "logseq"),
+		JournalsDir:    filepath.Join(tempDir, "Logseq", "journals"),
+		PagesDir:       filepath.Join(tempDir, "Logseq", "pages"),
+		ConfigDir:      filepath.Join(tempDir, ".config", "lsq"),
 		OriginalEditor: os.Getenv("EDITOR"),
 		OriginalHome:   os.Getenv("HOME"),
+		OriginalConfig: os.Getenv("XDG_HOME_CONFIG"),
 	}
 
 	helper.setupTestEnvironment()
@@ -51,7 +55,9 @@ func (h *TestHelper) setupTestEnvironment() {
 	dirs := []string{
 		h.LogseqDir,
 		h.JournalsDir,
-		filepath.Join(h.LogseqDir, "logseq"),
+		h.ConfigDir,
+		h.LogseqSetts,
+		h.PagesDir,
 	}
 
 	for _, dir := range dirs {
@@ -60,20 +66,10 @@ func (h *TestHelper) setupTestEnvironment() {
 		}
 	}
 
-	// Set up basic config.edn
-	defaultConfig := `{
-		:meta/version 1
-		:preferred-format "Markdown"
-		:journal/file-name-format "yyyy_MM_dd"
-	}`
-
-	if err := os.WriteFile(h.ConfigPath, []byte(defaultConfig), 0644); err != nil {
-		h.t.Fatalf("Failed to write config file: %v", err)
-	}
-
 	// Set environment variables
 	os.Setenv("HOME", h.TempDir)
 	os.Setenv("EDITOR", "echo") // Use 'echo' as a safe test editor
+	os.Setenv("XDG_CONFIG_HOME", filepath.Join(h.TempDir, ".config"))
 }
 
 // Cleanup restores the original environment state
@@ -82,6 +78,7 @@ func (h *TestHelper) Cleanup() {
 
 	os.Setenv("EDITOR", h.OriginalEditor)
 	os.Setenv("HOME", h.OriginalHome)
+	os.Setenv("XDG_CONFIG_HOME", h.OriginalConfig)
 }
 
 // AssertFileExists checks if a file exists and contains expected content

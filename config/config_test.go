@@ -60,46 +60,44 @@ func TestConfigLoad(t *testing.T) {
 	}
 	defer os.RemoveAll(tempDir)
 
-	// a mock Logseq config for testing
-	logseqConfig := []byte(`{:meta/version 1
-		:preferred-format "Markdown"
-		:journal/file-name-format "yyyy_MM_dd"}`)
+	cfgPath := filepath.Join("lsq", "config.edn")
 
 	testCases := []struct {
 		name          string
 		xdgConfigHome string
 		setupFiles    map[string][]byte
-		appPath       string
 		expectedCfg   config.Config
 		expectError   bool
 	}{
 		{
-			name:          "Valid XDG config with existing lsq config",
+			name:          "No existing lsq config, load defaults",
 			xdgConfigHome: tempDir,
-			setupFiles: map[string][]byte{
-				"lsq/config.edn": []byte(`{:meta/version 1 :file/format "yyyy_MM_dd" :file/type "Markdown" :file/path "/test/path"}`),
-			},
-			appPath: "/test/path",
+			setupFiles:    map[string][]byte{},
 			expectedCfg: config.Config{
-				Version:  1,
-				FileFmt:  "yyyy_MM_dd",
-				FileType: "Markdown",
-				FilePath: "/test/path",
+				Version:     1,
+				FileFmt:     "yyyy_MM_dd",
+				FileType:    "Markdown",
+				DirPath:     filepath.Join(tempDir, "Logseq"),
+				JournalsDir: filepath.Join(tempDir, "Logseq", "journals"),
+				PagesDir:    filepath.Join(tempDir, "Logseq", "pages"),
 			},
 			expectError: false,
 		},
 		{
-			name:          "No existing lsq config, valid Logseq config",
+			name:          "Valid XDG config with existing lsq config",
 			xdgConfigHome: tempDir,
 			setupFiles: map[string][]byte{
-				"logseq/config": logseqConfig,
+				cfgPath: []byte(`{:file/type "Markdown"
+                              :file/format "yyyy_MM_dd"
+                              :directory "/custom/path"}`),
 			},
-			appPath: "/test/path",
 			expectedCfg: config.Config{
-				Version:  1,
-				FileFmt:  "yyyy_MM_dd",
-				FileType: "Markdown",
-				FilePath: "/test/path",
+				Version:     1,
+				FileFmt:     "yyyy_MM_dd",
+				FileType:    "Markdown",
+				DirPath:     "/custom/path",
+				JournalsDir: "/custom/path/journals",
+				PagesDir:    "/custom/path/pages",
 			},
 			expectError: false,
 		},
@@ -107,25 +105,26 @@ func TestConfigLoad(t *testing.T) {
 			name:          "Invalid EDN in lsq config",
 			xdgConfigHome: tempDir,
 			setupFiles: map[string][]byte{
-				"lsq/config.edn": []byte(`{:invalid edn`),
+				cfgPath: []byte(`invalid edn`),
 			},
-			appPath:     "/test/path",
 			expectError: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setup test environment
-			if tc.xdgConfigHome != "" {
-				oldXDG := os.Getenv("XDG_CONFIG_HOME")
-				os.Setenv("XDG_CONFIG_HOME", tc.xdgConfigHome)
-				defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
-			} else {
-				oldXDG := os.Getenv("XDG_CONFIG_HOME")
-				os.Unsetenv("XDG_CONFIG_HOME")
-				defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
-			}
+			// Set up test environment
+			origConfigDir := os.Getenv("XDG_CONFIG_HOME")
+			origHomeDir := os.Getenv("HOME")
+
+			defer func() {
+				os.Setenv("XDG_CONFIG_HOME", origConfigDir)
+				os.Setenv("HOME", origHomeDir)
+			}()
+
+			// Set test environment variables
+			os.Setenv("XDG_CONFIG_HOME", tempDir)
+			os.Setenv("HOME", tempDir)
 
 			// Create test files
 			for path, content := range tc.setupFiles {
@@ -142,9 +141,7 @@ func TestConfigLoad(t *testing.T) {
 				}
 			}
 
-			// Run test
-			cfg := &config.Config{}
-			err := cfg.Load(tc.appPath)
+			cfg, err := config.Load()
 
 			// Verify results
 			if tc.expectError && err == nil {

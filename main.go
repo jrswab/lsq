@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/jrswab/lsq/config"
@@ -14,10 +13,8 @@ import (
 )
 
 func main() {
-	// File Path Overrides
+	// File Path Override
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
-	appCfgFileName := flag.String("c", "config.edn", "The config.edn file to use.")
-	appCfgDirName := flag.String("l", "logseq", "The Logseq configuration directory to use.")
 
 	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR or the TUI.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
@@ -29,32 +26,6 @@ func main() {
 
 	flag.Parse()
 
-	// Check for config file
-	// if file exists load it
-	// if file !exists load logseq config
-	// set flags as overrides after
-
-	// Consturct file paths:
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Printf("Error getting home directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Default path:
-	dirPath := filepath.Join(homeDir, "Logseq")
-
-	// When this flag is used replace path
-	if *lsqDirPath != "" {
-		dirPath = *lsqDirPath
-	}
-
-	// Load Config:
-	//cfg := &config.Config{
-	//	AppCfgDir:  *appCfgDirName,
-	//	AppCfgName: *appCfgFileName,
-	//}
-
 	cfg, err := config.Load()
 	if err != nil && !os.IsNotExist(err) {
 		// The user has a config file but we couldn't read it.
@@ -64,37 +35,21 @@ func main() {
 	}
 
 	// When this flag is used override the config.
-	dirPath = cfg.DirPath
 	if *lsqDirPath != "" {
-		dirPath = *lsqDirPath
+		cfg.DirPath = *lsqDirPath
 	}
-
-	// Load the logseq specific config when the lsq config is not present.
-	if os.IsNotExist(err) {
-		cfg, err = config.LoadAppConfig(dirPath,
-			filepath.Join(dirPath, fmt.Sprintf("%s/%s", *appCfgDirName, *appCfgFileName)),
-		)
-
-		if err != nil && !os.IsNotExist(err) {
-			log.Printf("Error loading configuration: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
-	journalsDir := filepath.Join(dirPath, "journals")
-	pagesDir := filepath.Join(dirPath, "pages")
 
 	// Open page in default editor if specified:
 	if *pageToOpen != "" {
 		// TUI can use search feature to find a page to open
-		system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", pagesDir, *pageToOpen))
+		system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", cfg.PagesDir, *pageToOpen))
 		return
 	}
 
 	// Init Search only when TUI or -f is passed
 	var searchTrie *trie.Trie
 	if *useTUI || !strings.EqualFold(*cliSearch, "") {
-		searchTrie, err = trie.Init(pagesDir)
+		searchTrie, err = trie.Init(cfg.PagesDir)
 		if err != nil {
 			log.Printf("error loading pages directory for search: %v\n", err)
 			os.Exit(1)
@@ -109,7 +64,7 @@ func main() {
 		}
 
 		if *openFirstResult {
-			system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", pagesDir, results[0]))
+			system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", cfg.PagesDir, results[0]))
 			return
 		}
 
@@ -122,13 +77,13 @@ func main() {
 	}
 
 	// Create journals directory if it doesn't exist
-	err = os.MkdirAll(journalsDir, 0755)
+	err = os.MkdirAll(cfg.JournalsDir, 0755)
 	if err != nil {
 		log.Printf("Error creating journals directory: %v\n", err)
 		os.Exit(1)
 	}
 
-	journalPath, err := system.GetJournal(cfg, journalsDir, *specDate)
+	journalPath, err := system.GetJournal(cfg, cfg.JournalsDir, *specDate)
 	if err != nil {
 		log.Printf("Error setting journal path: %v\n", err)
 		os.Exit(1)
