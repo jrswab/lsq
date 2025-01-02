@@ -88,14 +88,6 @@ As lsq moves toward v1.0.0, I've decided to focus on perfecting the core CLI exp
 - ~~`Enter`: Open selected file (current files saves on open)~~
 - ~~`Esc`: Close search modal~~
 
-## Configuration
-
-LSQ reads your Logseq configuration from `config.edn`. Supported settings:
-
-- `meta/version`: Configuration version
-- `preferred-format`: File format ("Markdown" or "Org")
-- `journal/file-name-format`: Date format for journal files (e.g., "yyyy_MM_dd")
-
 ## Dependencies
 
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea): Terminal UI framework
@@ -103,8 +95,6 @@ LSQ reads your Logseq configuration from `config.edn`. Supported settings:
 - [EDN](https://olympos.io/encoding/edn): Configuration file parsing
 
 ## Contributing
-
-First off, thank you for considering contributing to lsq! 🎉
 
 For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).
 
