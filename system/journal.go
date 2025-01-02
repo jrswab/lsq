@@ -52,29 +52,16 @@ func GetJournal(cfg *config.Config, journalsDir, specDate string) (string, error
 }
 
 func AppendToFile(path, content string) error {
-	bc := fmt.Sprintf("- %s", content)
+	bc := fmt.Sprintf("- %s\n", content)
 
-	// Try to create new file with O_EXCL
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
-	if err == nil {
-		// Successfully created new file
-		defer file.Close()
-		return os.WriteFile(path, []byte(bc), 0644)
-	}
-
-	// If error is not "file exists", return the error
-	// (it should have been created at this point)
-	if !os.IsExist(err) {
-		return err
-	}
-
-	// File exists, append to it
-	file, err = os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0644)
+	// Open the file in append and write only mode; create if needed.
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return err
+		panic(err)
 	}
 	defer file.Close()
 
-	_, err = file.WriteString(fmt.Sprintf("\n%s", bc))
+	// Write data to the file
+	_, err = file.WriteString(bc)
 	return err
 }
