@@ -13,6 +13,8 @@ import (
 	"github.com/jrswab/lsq/trie"
 )
 
+const semVer string = "0.11.0"
+
 func main() {
 	// File Path Override
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
@@ -24,8 +26,14 @@ func main() {
 	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extention.")
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 	useTUI := flag.Bool("t", false, "Use the custom TUI instead of directly opening the system editor")
+	version := flag.Bool("v", false, "Display current lsq version")
 
 	flag.Parse()
+
+	if *version {
+		fmt.Println(semVer)
+		os.Exit(0)
+	}
 
 	cfg, err := config.Load()
 	if err != nil && !os.IsNotExist(err) {
