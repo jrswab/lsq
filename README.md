@@ -36,7 +36,7 @@ If no editor is defined in $EDITOR then `Vim` is will be used.
 ### Command Line Options
 
 - `-a`: Append text directly to the current journal page
-- `-d`: Specify Logseq directory path. (default: "~/Logseq", expample: "/home/jaron/Document/Notes" you can also used "~/" instead of full home path.)
+- `-d`: Specify Logseq directory path. (default: "/home/username/Logseq", expample: "/home/username/Document/Notes".)
 - `-e`: Set editor to use while editing files. (If the flag is not provided `$EDITOR` is used. If `$EDITOR` is not set, Vim is used.)
 - `-f`: Search pages and aliases. Must be followed by a string.
 - `-o`: Automatically open the first result from the search.
