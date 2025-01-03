@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jrswab/lsq/config"
@@ -37,16 +38,17 @@ func main() {
 	// When this flag is used override the config.
 	if *lsqDirPath != "" {
 		cfg.DirPath = *lsqDirPath
+		cfg.JournalsDir = filepath.Join(cfg.DirPath, "journals")
+		cfg.PagesDir = filepath.Join(cfg.DirPath, "pages")
 	}
 
 	// Open page in default editor if specified:
 	if *pageToOpen != "" {
-		// TUI can use search feature to find a page to open
 		system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", cfg.PagesDir, *pageToOpen))
 		return
 	}
 
-	// Init Search only when TUI or -f is passed
+	// Init Search only when "-f" is passed
 	var searchTrie *trie.Trie
 	if *useTUI || !strings.EqualFold(*cliSearch, "") {
 		searchTrie, err = trie.Init(cfg.PagesDir)
@@ -76,10 +78,16 @@ func main() {
 		return
 	}
 
-	// Create journals directory if it doesn't exist
-	err = os.MkdirAll(cfg.JournalsDir, 0755)
+	// Check that the journals directory exists
+	_, err = os.Stat(cfg.DirPath)
 	if err != nil {
-		log.Printf("Error creating journals directory: %v\n", err)
+		if os.IsNotExist(err) {
+			fmt.Printf("Could not find Logseq files at '%s'.\n", cfg.DirPath)
+			fmt.Printf("Make sure the path is correct and the directories exist./n")
+			os.Exit(0)
+		}
+
+		log.Printf("Error loading the main directory: %v\n", err)
 		os.Exit(1)
 	}
 

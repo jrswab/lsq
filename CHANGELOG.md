@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.10.2] - 2025-01-03
+### Added
+- Console messages when the supplied path for pages and journals does not exist.
+
+### Changed
+- No longer creating the main directory path when the full path does not exist.
+
+### Fixed
+- Configuration override not being applied on `-d`
+
+## [0.10.1] - 2025-01-03
 ### Fixed
 - Empty line appearing before text when using the append flag.
 

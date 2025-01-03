@@ -72,7 +72,7 @@ func Load() (*Config, error) {
 
 	// Check for missing data and use defaults
 	if c.DirPath == "" {
-		c.DirPath = homeDir
+		c.DirPath = filepath.Join(homeDir, "Logseq")
 	}
 
 	// Set Logseq default directories

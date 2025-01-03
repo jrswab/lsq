@@ -4,45 +4,33 @@ A command-line tool for rapid journal entry creation in Logseq, featuring both T
 
 ## Features
 - External editor integration ($EDITOR by default)
-- Terminal User Interface (TUI) with real-time editing
 - Automatic journal file creation
 - Support for both Markdown and Org formats
 - Configurable file naming format
-- Customizable Logseq directory location
+- Customizable directory location
 - User defined configuration file
 
-### TUI Specific Features
-- File search functionality with prefix matching
-- TODO & priority cycling through keyboard shortcuts
-- Line indentation & unindentation
-- Auto-save when switching files through search
-
 ## Installation
-
 ```bash
 go install github.com/jrswab/lsq@latest
 ```
 
 ## Usage
-
 Basic usage:
 ```bash
 lsq
 ```
-
 This opens today's journal in your default editor ($EDITOR environment variable).
-If no editor is defined in $EDITOR then `Vim` is will be used.
+If no editor is defined in $EDITOR, then `Vim` will be used.
 
 ### Command Line Options
-
 - `-a`: Append text directly to the current journal page
-- `-d`: Specify Logseq directory path. (default: "/home/username/Logseq", expample: "/home/username/Document/Notes".)
-- `-e`: Set editor to use while editing files. (If the flag is not provided `$EDITOR` is used. If `$EDITOR` is not set, Vim is used.)
+- `-d`: Specify main directory path. (example: `/home/jrswab/Documents/Notes`)
+- `-e`: Set editor to use while editing files. (Defaults to $EDITOR, then Vim if $EDITOR is not set)
 - `-f`: Search pages and aliases. Must be followed by a string.
 - `-o`: Automatically open the first result from the search.
-- `-p`: Open a specific page from the Logseq pages directory.
-- `-s`: Specify the journal date to open. (Must be `yyy-MM-dd` formatted)
-- ~~`-t`: Use the built-in TUI instead of external editor.~~
+- `-p`: Open a specific page from the pages directory.
+- `-s`: Specify the journal date to open. (Must be `yyyy-MM-dd` formatted)
 
 ### Configuration File
 This file must be stored in your config directory as `lsq/config.edn`.
@@ -51,15 +39,15 @@ On macOS, it returns `$HOME/Library/Application Support`.
 On Windows, it returns `%AppData%`.
 On Plan 9, it returns `$home/lib`.
 
-#### Configuration Overrides
+#### Configuration Behavior
 The configuration file will override any lsq defaults which are defined. If a CLI flag is provided, the flag value will override the config file value.
 
-#### Configuration Example:
+#### Configuration File Example:
 ```EDN
 {
   ;; Either "Markdown" or "Org".
   :file/type "Markdown"
-  ;; This wil be used for joural file names
+  ;; This will be used for journal file names
   ;; Using the format below and the file type above will produce 2025.01.01.md
   :file/format "yyyy_MM_dd"
   ;; The directory which holds all your notes
@@ -71,33 +59,28 @@ The configuration file will override any lsq defaults which are defined. If a CL
 As lsq moves toward v1.0.0, I've decided to focus on perfecting the core CLI experience. The TUI interface is now deprecated in favor of enhanced external editor integration and improved command-line workflows. This aligns with the project goal of providing the fastest, most reliable journaling experience possible. While the TUI was fast and operated well, it's outside of the current scope of this project. However, this does not mean that TUI is gone forever and if the community wants a TUI after v1.0.0 is released, I'd be happy to work on it again.
 
 ### TUI Controls (Deprecated)
-
-- ~~`Ctrl+S`: Save current file~~
-- ~~`Ctrl+C`: Quit~~
-- ~~`Ctrl+T`: Cycle through TODO states on current line~~
-- ~~`Ctrl+P`: Cycle through priority states on current line~~
-- ~~`Ctrl+F`: Open search modal~~
-- ~~`tab`: Indent the entire line from anywhere on the line.~~
-- ~~`shift+tab`: Unindent the line from anywhere on te line.~~
-- ~~Arrow keys: Navigate through text~~
+- `Ctrl+S`: Save current file
+- `Ctrl+C`: Quit
+- `Ctrl+T`: Cycle through TODO states on current line
+- `Ctrl+P`: Cycle through priority states on current line
+- `Ctrl+F`: Open search modal
+- `tab`: Indent the entire line from anywhere on the line.
+- `shift+tab`: Unindent the line from anywhere on the line.
+- Arrow keys: Navigate through text
 
 ### TUI Search Modal Controls (Deprecated)
-
-- ~~Type to search through files~~
-- ~~`↑/↓`: Navigate through results~~
-- ~~`Enter`: Open selected file (current files saves on open)~~
-- ~~`Esc`: Close search modal~~
+- Type to search through files
+- `↑/↓`: Navigate through results
+- `Enter`: Open selected file (current file saves on open)
+- `Esc`: Close search modal
 
 ## Dependencies
-
 - [Bubble Tea](https://github.com/charmbracelet/bubbletea): Terminal UI framework
 - [Lipgloss](https://github.com/charmbracelet/lipgloss): Terminal UI styling
 - [EDN](https://olympos.io/encoding/edn): Configuration file parsing
 
 ## Contributing
-
 For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).
 
 ## License
-
 GPL v3
