@@ -6,8 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.11.0] - 2025-01-03
 ### Added
 - `-v` flag to display the current version of lsq.
+- `-y` flag to open yesterday's journal file.
 
 ## [0.10.2] - 2025-01-03
 ### Added
@@ -32,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - README to reflect TUI deprecation
-- How the `d` flag operates. The full path must be specified when using this flag. Example: "/home/jaron/documents/notes"
+- How the `d` flag operates. The full path must be specified when using this flag. Example: "/home/jrswab/documents/notes"
 - No longer using the Logseq `config.edn` file.
 - `CONTRIBUTIONS.md` to be `CONTRIBUTING.md`
 - `README.md`

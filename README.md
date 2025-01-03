@@ -32,6 +32,7 @@ If no editor is defined in $EDITOR, then `Vim` will be used.
 - `-p`: Open a specific page from the pages directory.
 - `-s`: Specify the journal date to open. (Must be `yyyy-MM-dd` formatted)
 - `-v`: Display the version of lsq being executed. (Added in v0.11.0)
+- `-y`: Open yesterday's journal file. (Added in v0.11.0)
 
 ### Configuration File
 This file must be stored in your config directory as `lsq/config.edn`.

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/jrswab/lsq/config"
 	"github.com/jrswab/lsq/system"
@@ -27,6 +28,7 @@ func main() {
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 	useTUI := flag.Bool("t", false, "Use the custom TUI instead of directly opening the system editor")
 	version := flag.Bool("v", false, "Display current lsq version")
+	yesterday := flag.Bool("y", false, "Open yesterday's journal page")
 
 	flag.Parse()
 
@@ -97,6 +99,10 @@ func main() {
 
 		log.Printf("Error loading the main directory: %v\n", err)
 		os.Exit(1)
+	}
+
+	if *yesterday {
+		*specDate = time.Now().Add(-24 * time.Hour).Format("2006-01-02")
 	}
 
 	journalPath, err := system.GetJournal(cfg, cfg.JournalsDir, *specDate)
