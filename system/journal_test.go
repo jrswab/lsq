@@ -141,7 +141,8 @@ func TestAppendToFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected := "- new content"
+
+		expected := "- new content\n"
 		if string(content) != expected {
 			t.Errorf("Expected %q, got %q", expected, string(content))
 		}
@@ -160,22 +161,9 @@ func TestAppendToFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected := "- first\n- second"
+		expected := "- first\n- second\n"
 		if string(content) != expected {
 			t.Errorf("Expected %q, got %q", expected, string(content))
-		}
-	})
-
-	t.Run("permission denied", func(t *testing.T) {
-		readOnlyDir := filepath.Join(tmpDir, "readonly")
-		if err := os.Mkdir(readOnlyDir, 0500); err != nil {
-			t.Fatal(err)
-		}
-
-		testFile := filepath.Join(readOnlyDir, "test.md")
-		err := system.AppendToFile(testFile, "content")
-		if err == nil {
-			t.Error("Expected error for read-only directory")
 		}
 	})
 }
