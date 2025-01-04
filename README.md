@@ -1,8 +1,15 @@
 # lsq
 
-A command-line tool for rapid journal entry creation in Logseq, featuring both TUI and external editor support.
+The Ultra-fast CLI Companion for Logseq to speed up your workflow directly from your terminal.
 
-## Features
+## Why lsq?
+- ⚡️ Lightning-fast journal additions without leaving your terminal
+- ⌨️ Optimized for both quick captures and extended writing sessions
+- 🎯 Native support for Logseq's file naming and formatting conventions
+- 🔄 Seamless integration with your existing Logseq workflow
+- 🧑‍💻 Built by Logseq users, for Logseq users
+
+## Features That Power Your Workflow
 - External editor integration ($EDITOR by default)
 - Automatic journal file creation
 - Support for both Markdown and Org formats
@@ -10,7 +17,7 @@ A command-line tool for rapid journal entry creation in Logseq, featuring both T
 - Customizable directory location
 - User defined configuration file
 
-## Installation
+## Ready to Start? Install lsq
 ```bash
 go install github.com/jrswab/lsq@latest
 ```
