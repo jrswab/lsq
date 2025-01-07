@@ -1,6 +1,6 @@
 # lsq
 
-A command-line tool for rapid journal entry creation in Logseq, featuring both TUI and external editor support.
+A command-line tool for rapid journaling with Logseq.
 
 ## Features
 - External editor integration ($EDITOR by default)
@@ -16,13 +16,6 @@ go install github.com/jrswab/lsq@latest
 ```
 
 ## Usage
-Basic usage:
-```bash
-lsq
-```
-This opens today's journal in your default editor ($EDITOR environment variable).
-If no editor is defined in $EDITOR, then `Vim` will be used.
-
 ### Command Line Options
 - `-a`: Append text directly to the current journal page
 - `-d`: Specify main directory path. (example: `/home/jrswab/Documents/Notes`)
@@ -33,6 +26,25 @@ If no editor is defined in $EDITOR, then `Vim` will be used.
 - `-s`: Specify the journal date to open. (Must be `yyyy-MM-dd` formatted)
 - `-v`: Display the version of lsq being executed. (Added in v0.11.0)
 - `-y`: Open yesterday's journal file. (Added in v0.11.0)
+
+Basic usage:
+```bash
+lsq
+```
+This opens today's journal in your default editor ($EDITOR environment variable).
+If no editor is defined in $EDITOR, then `Vim` will be used.
+
+```bash
+lsq -p file_name.md -a "text to append"
+```
+This combination will append the text to the page with file name `file_name.md`.
+If `-p` is not provided the appended text will be placed in today's journal entry.
+
+```bash
+lsq -f word -o
+```
+This will search your pages for files containing "word" and open the first result in $EDITOR.
+If `-o` is not provided lsq will output all files which contain "word" to STDOUT.
 
 ### Configuration File
 This file must be stored in your config directory as `lsq/config.edn`.
@@ -56,6 +68,7 @@ The configuration file will override any lsq defaults which are defined. If a CL
   :directory "/home/jaron/Logseq"
 }
 ```
+**Note:** The configured directory must contain both a `journals` and `pages` subdirectory for lsq to function properly. These are automatically created when using Logseq, but will need to be manually created if setting lsq to use a new directory.
 
 ## TUI (Deprecated)
 As lsq moves toward v1.0.0, I've decided to focus on perfecting the core CLI experience. The TUI interface is now deprecated in favor of enhanced external editor integration and improved command-line workflows. This aligns with the project goal of providing the fastest, most reliable journaling experience possible. While the TUI was fast and operated well, it's outside of the current scope of this project. However, this does not mean that TUI is gone forever and if the community wants a TUI after v1.0.0 is released, I'd be happy to work on it again.
