@@ -3,6 +3,7 @@ package system
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -54,12 +55,37 @@ func GetJournal(cfg *config.Config, journalsDir, specDate string) (string, error
 func AppendToFile(path, content string) error {
 	bc := fmt.Sprintf("- %s\n", content)
 
-	// Open the file in append and write only mode; create if needed.
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("error getting file stats: %w", err)
+	}
+
+	if stat.Size() == 0 { // Can't check for a new line if the file size is 0
+		_, err = file.WriteString(bc)
+		return err
+	}
+
+	_, err = file.Seek(-1, io.SeekEnd) // -1 to read the byte before io.SeekEnd
+	if err != nil {
+		return fmt.Errorf("error seeking to end of file: %w", err)
+	}
+
+	buf := make([]byte, 1) // Only need to store the last byte
+	_, err = file.Read(buf)
+	if err != nil {
+		return fmt.Errorf("error reading last byte: %w", err)
+	}
+
+	// When theh last byte is not a new line add it to the bulleted content
+	if buf[0] != '\n' {
+		bc = fmt.Sprintf("\n- %s\n", content)
+	}
 
 	// Write data to the file
 	_, err = file.WriteString(bc)

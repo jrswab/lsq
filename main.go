@@ -52,9 +52,22 @@ func main() {
 		cfg.PagesDir = filepath.Join(cfg.DirPath, "pages")
 	}
 
-	// Open page in default editor if specified:
 	if *pageToOpen != "" {
-		system.LoadEditor(*editorType, fmt.Sprintf("%s/%s", cfg.PagesDir, *pageToOpen))
+		pagePath := filepath.Join(cfg.PagesDir, *pageToOpen)
+
+		// Append to page and exit.
+		if *apnd != "" {
+			err := system.AppendToFile(pagePath, *apnd)
+			if err != nil {
+				log.Printf("Error appending data to file: %v\n", err)
+				os.Exit(1)
+			}
+			// Don't open $EDITOR when append flag is used.
+			return
+		}
+
+		// Open page in default editor if specified:
+		system.LoadEditor(*editorType, pagePath)
 		return
 	}
 
@@ -118,7 +131,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Don't open $EDITOR or TUI when append flag is used.
+		// Don't open $EDITOR  when append flag is used.
 		return
 	}
 

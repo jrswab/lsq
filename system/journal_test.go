@@ -1,6 +1,7 @@
 package system_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -131,39 +132,85 @@ func TestAppendToFile(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	t.Run("new file creation", func(t *testing.T) {
-		testFile := filepath.Join(tmpDir, "new.md")
-		if err := system.AppendToFile(testFile, "new content"); err != nil {
-			t.Errorf("Failed to create new file: %v", err)
-		}
+	tests := []struct {
+		name           string
+		initialContent string
+		appendContent  string
+		expectedResult string
+		expectError    bool
+	}{
+		{
+			name:           "new empty file",
+			initialContent: "",
+			appendContent:  "new content",
+			expectedResult: "- new content\n",
+			expectError:    false,
+		},
+		{
+			name:           "append to file with content and newline",
+			initialContent: "- existing content\n",
+			appendContent:  "new content",
+			expectedResult: "- existing content\n- new content\n",
+			expectError:    false,
+		},
+		{
+			name:           "append to file without trailing newline",
+			initialContent: "- existing content",
+			appendContent:  "new content",
+			expectedResult: "- existing content\n- new content\n",
+			expectError:    false,
+		},
+		{
+			name:           "append empty content",
+			initialContent: "- existing content\n",
+			appendContent:  "",
+			expectedResult: "- existing content\n- \n",
+			expectError:    false,
+		},
+		{
+			name:           "append content with special characters",
+			initialContent: "- existing content\n",
+			appendContent:  "content with * and - and #",
+			expectedResult: "- existing content\n- content with * and - and #\n",
+			expectError:    false,
+		},
+		{
+			name:           "append multiple lines",
+			initialContent: "- existing content\n",
+			appendContent:  "line1\nline2",
+			expectedResult: "- existing content\n- line1\nline2\n",
+			expectError:    false,
+		},
+	}
 
-		content, err := os.ReadFile(testFile)
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testFile := filepath.Join(tmpDir, fmt.Sprintf("%s.md", tt.name))
 
-		expected := "- new content\n"
-		if string(content) != expected {
-			t.Errorf("Expected %q, got %q", expected, string(content))
-		}
-	})
+			// Create file with initial content if any
+			if tt.initialContent != "" {
+				if err := os.WriteFile(testFile, []byte(tt.initialContent), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
 
-	t.Run("append to existing", func(t *testing.T) {
-		testFile := filepath.Join(tmpDir, "existing.md")
-		if err := system.AppendToFile(testFile, "first"); err != nil {
-			t.Fatal(err)
-		}
-		if err := system.AppendToFile(testFile, "second"); err != nil {
-			t.Errorf("Failed to append: %v", err)
-		}
+			err := system.AppendToFile(testFile, tt.appendContent)
 
-		content, err := os.ReadFile(testFile)
-		if err != nil {
-			t.Fatal(err)
-		}
-		expected := "- first\n- second\n"
-		if string(content) != expected {
-			t.Errorf("Expected %q, got %q", expected, string(content))
-		}
-	})
+			// Check error expectation
+			if (err != nil) != tt.expectError {
+				t.Errorf("AppendToFile() error = %v, expectError %v", err, tt.expectError)
+				return
+			}
+
+			// Read and verify file content
+			content, err := os.ReadFile(testFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if string(content) != tt.expectedResult {
+				t.Errorf("Expected %q, got %q", tt.expectedResult, string(content))
+			}
+		})
+	}
 }
