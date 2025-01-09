@@ -1,6 +1,12 @@
+<p align="center">
+<img width="25%" src="https://lsq.sh/media/img/lsq_logo_cropped.png" alt="lsq logo">
+</p>
+
 # lsq
 
-The Ultra-fast CLI Companion for Logseq to speed up your workflow directly from your terminal.
+The Ultra-fast CLI Companion for Logseq.
+
+Speed up your workflow directly from your terminal!
 
 ## Why lsq?
 - ⚡️ Lightning-fast journal additions without leaving your terminal
