@@ -14,19 +14,18 @@ import (
 	"github.com/jrswab/lsq/trie"
 )
 
-const semVer string = "0.11.0"
+const semVer string = "1.0.0"
 
 func main() {
 	// File Path Override
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
 
-	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR or the TUI.")
+	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
-	cliSearch := flag.String("f", "", "Search the logseq graph without the TUI")
+	cliSearch := flag.String("f", "", "Search by file name in your pages directory.")
 	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
-	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extention.")
+	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extension.")
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
-	useTUI := flag.Bool("t", false, "Use the custom TUI instead of directly opening the system editor")
 	version := flag.Bool("v", false, "Display current lsq version")
 	yesterday := flag.Bool("y", false, "Open yesterday's journal page")
 
@@ -73,7 +72,7 @@ func main() {
 
 	// Init Search only when "-f" is passed
 	var searchTrie *trie.Trie
-	if *useTUI || !strings.EqualFold(*cliSearch, "") {
+	if !strings.EqualFold(*cliSearch, "") {
 		searchTrie, err = trie.Init(cfg.PagesDir)
 		if err != nil {
 			log.Printf("error loading pages directory for search: %v\n", err)
@@ -132,12 +131,6 @@ func main() {
 		}
 
 		// Don't open $EDITOR  when append flag is used.
-		return
-	}
-
-	// After the file exists, branch based on mode
-	if *useTUI {
-		system.LoadTui(cfg, journalPath, searchTrie)
 		return
 	}
 
