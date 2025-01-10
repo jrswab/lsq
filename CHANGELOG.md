@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-01-09
+
 ## [0.12.0] - 2025-01-07
 ### Added
 - Ability to append to any given page using `-p` and `-a` together.
