@@ -9,7 +9,7 @@ import (
 )
 
 // Node represents a single character in the trie.
-// Char is the string repersentation of the character
+// Char is the string representation of the character
 // Each node has 26 childe nodes which represent each
 // letter of the alphabet.
 type Node struct {
@@ -46,7 +46,7 @@ func NewTrie() *Trie {
 }
 
 func Init(path string) (*Trie, error) {
-	var tree = NewTrie()
+	tree := NewTrie()
 
 	// get list of all files in ~/Logseq/Pages
 	fileList, err := os.ReadDir(path)

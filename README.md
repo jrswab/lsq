@@ -4,16 +4,18 @@
 
 # lsq
 
-The Ultra-fast CLI Companion for Logseq.
+[![Go Report Card](https://goreportcard.com/badge/github.com/jrswab/lsq)](https://goreportcard.com/report/github.com/jrswab/lsq)
+[![Release](https://img.shields.io/github/v/release/jrswab/lsq)](https://github.com/jrswab/lsq/releases)
+[![License](https://img.shields.io/github/license/jrswab/lsq)](https://github.com/jrswab/lsq/blob/master/LICENSE)
 
-Speed up your workflow directly from your terminal!
+The ultra-fast CLI companion for [Logseq](https://github.com/logseq/logseq) designed to speed up your note capture directly from the terminal!
 
 ## Why lsq?
 - ⚡️ Lightning-fast journal additions without leaving your terminal
 - ⌨️ Optimized for both quick captures and extended writing sessions
 - 🎯 Native support for Logseq's file naming and formatting conventions
 - 🔄 Seamless integration with your existing Logseq workflow
-- 🧑‍💻 Built by Logseq users, for Logseq users
+- 💻 Built by Logseq users, for Logseq users
 
 ## Features That Power Your Workflow
 - External editor integration ($EDITOR by default)
@@ -23,9 +25,12 @@ Speed up your workflow directly from your terminal!
 - Customizable directory location
 - User defined configuration file
 
-## Ready to Start? Install lsq
+## Ready to Start?
 ```bash
 go install github.com/jrswab/lsq@latest
+```
+```bash
+lsq
 ```
 
 ## Usage
@@ -37,27 +42,8 @@ go install github.com/jrswab/lsq@latest
 - `-o`: Automatically open the first result from the search.
 - `-p`: Open a specific page from the pages directory.
 - `-s`: Specify the journal date to open. (Must be `yyyy-MM-dd` formatted)
-- `-v`: Display the version of lsq being executed. (Added in v0.11.0)
-- `-y`: Open yesterday's journal file. (Added in v0.11.0)
-
-Basic usage:
-```bash
-lsq
-```
-This opens today's journal in your default editor ($EDITOR environment variable).
-If no editor is defined in $EDITOR, then `Vim` will be used.
-
-```bash
-lsq -p file_name.md -a "text to append"
-```
-This combination will append the text to the page with file name `file_name.md`.
-If `-p` is not provided the appended text will be placed in today's journal entry.
-
-```bash
-lsq -f word -o
-```
-This will search your pages for files containing "word" and open the first result in $EDITOR.
-If `-o` is not provided lsq will output all files which contain "word" to STDOUT.
+- `-v`: Display the version of lsq being executed.
+- `-y`: Open yesterday's journal file.
 
 ### Configuration File
 This file must be stored in your config directory as `lsq/config.edn`.
@@ -81,31 +67,26 @@ The configuration file will override any lsq defaults which are defined. If a CL
   :directory "/home/jaron/Logseq"
 }
 ```
-**Note:** The configured directory must contain both a `journals` and `pages` subdirectory for lsq to function properly. These are automatically created when using Logseq, but will need to be manually created if setting lsq to use a new directory.
+**Note:** The configured directory must contain both a `journals` and `pages` subdirectory for lsq to function properly. These are automatically created when using Logseq, but will need to be manually created if setting lsq to use a new directory or without Logseq.
 
-## TUI (Deprecated)
-As lsq moves toward v1.0.0, I've decided to focus on perfecting the core CLI experience. The TUI interface is now deprecated in favor of enhanced external editor integration and improved command-line workflows. This aligns with the project goal of providing the fastest, most reliable journaling experience possible. While the TUI was fast and operated well, it's outside of the current scope of this project. However, this does not mean that TUI is gone forever and if the community wants a TUI after v1.0.0 is released, I'd be happy to work on it again.
+### Usage Examples:
+```bash
+lsq
+```
+This opens today's journal in your default editor ($EDITOR environment variable).
+If no editor is defined in $EDITOR, then `Vim` will be used.
 
-### TUI Controls (Deprecated)
-- `Ctrl+S`: Save current file
-- `Ctrl+C`: Quit
-- `Ctrl+T`: Cycle through TODO states on current line
-- `Ctrl+P`: Cycle through priority states on current line
-- `Ctrl+F`: Open search modal
-- `tab`: Indent the entire line from anywhere on the line.
-- `shift+tab`: Unindent the line from anywhere on the line.
-- Arrow keys: Navigate through text
+```bash
+lsq -p file_name.md -a "text to append"
+```
+This combination will append the text to the page with file name `file_name.md`.
+If `-p` is not provided the appended text will be placed in today's journal entry.
 
-### TUI Search Modal Controls (Deprecated)
-- Type to search through files
-- `↑/↓`: Navigate through results
-- `Enter`: Open selected file (current file saves on open)
-- `Esc`: Close search modal
-
-## Dependencies
-- [Bubble Tea](https://github.com/charmbracelet/bubbletea): Terminal UI framework
-- [Lipgloss](https://github.com/charmbracelet/lipgloss): Terminal UI styling
-- [EDN](https://olympos.io/encoding/edn): Configuration file parsing
+```bash
+lsq -f word -o
+```
+This will search your pages for files containing "word" and open the first result in $EDITOR.
+If `-o` is not provided lsq will output all files which contain "word" to STDOUT.
 
 ## Contributing
 For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).
