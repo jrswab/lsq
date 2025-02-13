@@ -36,6 +36,7 @@ lsq
 ## Usage
 ### Command Line Options
 - `-a`: Append text directly to the current journal page
+- `-A`: Append the contents of STDIN to the current journal page
 - `-d`: Specify main directory path. (example: `/home/jrswab/Documents/Notes`)
 - `-e`: Set editor to use while editing files. (Defaults to $EDITOR, then Vim if $EDITOR is not set)
 - `-f`: Search pages and aliases. Must be followed by a string.
@@ -87,6 +88,13 @@ lsq -f word -o
 ```
 This will search your pages for files containing "word" and open the first result in $EDITOR.
 If `-o` is not provided lsq will output all files which contain "word" to STDOUT.
+
+```bash
+cat ~/.zshrc | lsq -A
+```
+This will take the contents of your `~/.zshrc` file and append it to your current
+journal. This reads STDIN through to end-of-file, so be sure to `Ctrl-d` if your
+contents don't contain an end-of-file.
 
 ## Contributing
 For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).

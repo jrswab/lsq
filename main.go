@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"io"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ func main() {
 	// File Path Override
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
 
+	apndStdin := flag.Bool("A", false, "Append STDIN to the current journal page. This will not open $EDITOR.")
 	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
 	cliSearch := flag.String("f", "", "Search by file name in your pages directory.")
@@ -34,6 +36,15 @@ func main() {
 	if *version {
 		fmt.Println(semVer)
 		os.Exit(0)
+	}
+
+	if *apndStdin {
+		content, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading STDIN: %v\n", err)
+			os.Exit(1)
+		}
+		*apnd = string(content)
 	}
 
 	cfg, err := config.Load()
