@@ -115,9 +115,8 @@ func main() {
 	_, err = os.Stat(cfg.DirPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			fmt.Printf("Could not find Logseq files at '%s'.\n", cfg.DirPath)
-			fmt.Printf("Make sure the path is correct and the directories exist./n")
-			os.Exit(0)
+			fmt.Printf("Could not find Logseq files at '%s'.\nMake sure the path is correct and the directories exist.\n", cfg.DirPath)
+			os.Exit(1)
 		}
 
 		log.Printf("Error loading the main directory: %v\n", err)
