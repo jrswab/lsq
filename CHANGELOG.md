@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-05-6
 ### Fixed
-- Printed calls and formatting
+- Printed calls and formatting by @em-er-es
 
 ### Added
-- Regex search using `-r`
+- Regex search using `-r` by @em-er-es
 
 ## [1.1.0] - 2025-02-16
 ### Added
