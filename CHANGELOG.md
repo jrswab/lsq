@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Printed calls and formatting
 
+### Added
+- Regex search using `-r`
+
 ## [1.1.0] - 2025-02-16
 ### Added
 - The ability to paste from STDIN using `-A`. by @manchicken

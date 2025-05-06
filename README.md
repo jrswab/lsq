@@ -42,6 +42,7 @@ lsq
 - `-f`: Search pages and aliases. Must be followed by a string.
 - `-o`: Automatically open the first result from the search.
 - `-p`: Open a specific page from the pages directory.
+- `-r`: Search pages and journals via regex pattern. Must be followed by a regex string.
 - `-s`: Specify the journal date to open. (Must be `yyyy-MM-dd` formatted)
 - `-v`: Display the version of lsq being executed.
 - `-y`: Open yesterday's journal file.

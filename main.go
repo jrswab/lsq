@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"io"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +18,42 @@ import (
 )
 
 const semVer string = "1.0.0"
+
+// Search regex pattern in given file, print matching lines
+func searchInFile(filePath string, pattern *regexp.Regexp) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	lineNumber := 0
+	for scanner.Scan() {
+		lineNumber++
+		line := scanner.Text()
+		if pattern.MatchString(line) {
+			fmt.Printf("%s#%d: %s\n", filePath, lineNumber, line)
+		}
+	}
+	return scanner.Err()
+}
+
+// Search regex pattern in all files within directory
+func searchInDirectory(directory string, pattern *regexp.Regexp) error {
+	return filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			err := searchInFile(path, pattern)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
 
 func main() {
 	// File Path Override
@@ -27,6 +65,7 @@ func main() {
 	cliSearch := flag.String("f", "", "Search by file name in your pages directory.")
 	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
 	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extension.")
+	regexSearch := flag.String("r", "", "Search by regex pattern in pages directory.")
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 	version := flag.Bool("v", false, "Display current lsq version")
 	yesterday := flag.Bool("y", false, "Open yesterday's journal page")
@@ -78,6 +117,25 @@ func main() {
 
 		// Open page in default editor if specified:
 		system.LoadEditor(*editorType, pagePath)
+		return
+	}
+
+	// Init regex search if "-r"
+	if *regexSearch != "" {
+		pattern, err := regexp.Compile(*regexSearch)
+		if err != nil {
+			log.Printf("Error compiling regex pattern: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Search in the directories
+		for _, searchDirectory := range []string{cfg.JournalsDir, cfg.PagesDir} {
+			err = searchInDirectory(searchDirectory, pattern)
+			if err != nil {
+				fmt.Println("Error searching directory:", err)
+			}
+		}
+
 		return
 	}
 
