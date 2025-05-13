@@ -26,9 +26,13 @@ The ultra-fast CLI companion for [Logseq](https://github.com/logseq/logseq) desi
 - User defined configuration file
 
 ## Ready to Start?
+1. Install the binary via Go:
 ```bash
 go install github.com/jrswab/lsq@latest
 ```
+2. Make sure you have the location of the Go binaries in your $PATH. Run `go env` and find the variable called `GOPATH`. Then copy that location to your shell's $PATH if it's not already there.
+
+3. Then run:
 ```bash
 lsq
 ```
