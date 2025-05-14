@@ -1,15 +1,14 @@
+# .github/workflows/release.yml
 # Create binaries on each release
 name: goreleaser
 
 on:
-  pull_request:
   push:
-    # run only against tags
     tags:
-      - "*"
+      - 'v*' # only version tags trigger a run
 
 permissions:
-  contents: write
+  contents: write # so GoReleaser can create the GitHub Release
 
 jobs:
   goreleaser:
@@ -18,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # fetch all tags so GoReleaser sees them
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
