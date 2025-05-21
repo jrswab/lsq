@@ -110,9 +110,7 @@ func (t *Trie) InsertFileName(fileName string) {
 		normalizedWord = removeNonAlpha(fileName)
 	)
 
-	runes := []rune(normalizedWord)
-
-	for _, r := range runes {
+	for _, r := range normalizedWord {
 		// Check if current node has this rune as a node
 		_, exists := current.Children[r]
 		if !exists {
@@ -134,10 +132,7 @@ func (t *Trie) InsertAlias(alias, fileName string) {
 	// Use the same normalization function as the other methods
 	normalizedAlias := removeNonAlpha(alias)
 
-	// Convert to runes for proper Unicode character handling
-	runeAlias := []rune(normalizedAlias)
-
-	for _, r := range runeAlias {
+	for _, r := range normalizedAlias {
 		// Check if the current node has this rune as a child
 		_, exists := current.Children[r]
 		if !exists {
@@ -184,9 +179,7 @@ func (t *Trie) Search(prefix string) []string {
 
 	normalizedPrefix := removeNonAlpha(prefix)
 
-	prefixRunes := []rune(normalizedPrefix)
-
-	for _, r := range prefixRunes {
+	for _, r := range normalizedPrefix {
 		if current == nil {
 			return nil
 		}
