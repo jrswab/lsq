@@ -6,15 +6,17 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 // Node represents a single character in the trie.
 // Char is the string representation of the character
-// Each node has 26 childe nodes which represent each
-// letter of the alphabet.
+// Each child contains a map of a rune to support non-ascii
+// characters.
 type Node struct {
 	Char        string
-	Children    [26]*Node
+	Children    map[rune]*Node
 	IsEndOfWord bool
 	IsAlias     bool
 	FileName    string
@@ -23,10 +25,9 @@ type Node struct {
 // NewNode is used to initialize a new node with it's 26 children
 // and each child should first be initialized to nil
 func NewNode(char string) *Node {
-	node := &Node{Char: char}
-
-	for i := 0; i < 26; i++ {
-		node.Children[i] = nil
+	node := &Node{
+		Char:     char,
+		Children: make(map[rune]*Node),
 	}
 
 	return node
@@ -105,24 +106,21 @@ func Init(path string) (*Trie, error) {
 // Insert inserts a word to the trie.
 func (t *Trie) InsertFileName(fileName string) {
 	var (
-		current      = t.RootNode
-		strippedWord = removeNonAlpha(fileName)
+		current        = t.RootNode
+		normalizedWord = removeNonAlpha(fileName)
 	)
 
-	for i := 0; i < len(strippedWord); i++ {
-		// a is decimal number 97
-		// b is decimal number 98
-		// and so on....
-		// 98-97=1 so the index of b is 1
-		index := strippedWord[i] - 'a'
+	runes := []rune(normalizedWord)
 
-		// Check if the current node has a child node created for this letter (ascii digit)
-		// if not create the node:
-		if current.Children[index] == nil {
-			current.Children[index] = NewNode(string(strippedWord[i]))
+	for _, r := range runes {
+		// Check if current node has this rune as a node
+		_, exists := current.Children[r]
+		if !exists {
+			// If not add it
+			current.Children[r] = NewNode(string(r))
 		}
 
-		current = current.Children[index]
+		current = current.Children[r]
 	}
 
 	// Mark this as end of the word to help avoid false positives.
@@ -131,25 +129,24 @@ func (t *Trie) InsertFileName(fileName string) {
 }
 
 func (t *Trie) InsertAlias(alias, fileName string) {
-	var (
-		current      = t.RootNode
-		strippedWord = removeNonAlpha(alias)
-	)
+	current := t.RootNode
 
-	for i := 0; i < len(strippedWord); i++ {
-		// a is decimal number 97
-		// b is decimal number 98
-		// and so on....
-		// 98-97=1 so the index of b is 1
-		index := strippedWord[i] - 'a'
+	// Use the same normalization function as the other methods
+	normalizedAlias := removeNonAlpha(alias)
 
-		// Check if the current node has a child node created for this letter (ascii digit)
-		// if not create the node:
-		if current.Children[index] == nil {
-			current.Children[index] = NewNode(string(strippedWord[i]))
+	// Convert to runes for proper Unicode character handling
+	runeAlias := []rune(normalizedAlias)
+
+	for _, r := range runeAlias {
+		// Check if the current node has this rune as a child
+		_, exists := current.Children[r]
+		if !exists {
+			// If not, create a new node
+			current.Children[r] = NewNode(string(r))
 		}
 
-		current = current.Children[index]
+		// Move to the child node
+		current = current.Children[r]
 	}
 
 	// Mark this as end of the word to help avoid false positives.
@@ -159,32 +156,47 @@ func (t *Trie) InsertAlias(alias, fileName string) {
 }
 
 func removeNonAlpha(fileName string) string {
+	// Step 1: Convert to lowercase first
 	s := strings.ToLower(fileName)
 
+	// Step 2: Remove file extensions
 	s = strings.ReplaceAll(s, ".md", "")
 	s = strings.ReplaceAll(s, ".org", "")
 
-	return strings.Map(func(r rune) rune {
+	// Step 3: Keep only letter characters
+	letters := []rune{}
+	for _, r := range s {
 		if unicode.IsLetter(r) {
-			return r
+			letters = append(letters, r)
 		}
-		return -1 // -1 tells strings.Map to remove this rune
-	}, s)
+	}
+	s = string(letters)
+
+	// NFC = Normalization Form Canonical Composition
+	// This ensures that characters like "é" are treated consistently
+	// whether they're a single codepoint or "e" + accent mark
+	return norm.NFC.String(s)
 }
 
 func (t *Trie) Search(prefix string) []string {
 	results := make(map[string]struct{}) // Use map for deduplication
 	current := t.RootNode
 
-	strippedPrefix := removeNonAlpha(prefix)
+	normalizedPrefix := removeNonAlpha(prefix)
 
-	// Navigate to prefix node
-	for i := 0; i < len(strippedPrefix); i++ {
-		index := strippedPrefix[i] - 'a'
-		if current == nil || current.Children[index] == nil {
+	prefixRunes := []rune(normalizedPrefix)
+
+	for _, r := range prefixRunes {
+		if current == nil {
 			return nil
 		}
-		current = current.Children[index]
+
+		nextNode, exists := current.Children[r]
+		if !exists {
+			return nil
+		}
+
+		current = nextNode
 	}
 
 	// Use map for collection
@@ -212,8 +224,6 @@ func collectFilesUnique(node *Node, results map[string]struct{}) {
 	}
 
 	for _, child := range node.Children {
-		if child != nil {
-			collectFilesUnique(child, results)
-		}
+		collectFilesUnique(child, results)
 	}
 }
