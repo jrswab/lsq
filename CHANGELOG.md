@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - release.yml workflow to automatically create binaries on each new release.
 
+### Changed
+- Searching with `lsq -f <word>` now encompasses Unicode characters and not only a-z.
+
 ## [1.2.1] - 2025-05-09
 ### Fixed
 - Outdated go.mod file
