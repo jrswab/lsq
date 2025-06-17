@@ -26,7 +26,7 @@ func TestInit(t *testing.T) {
 		"basic files without aliases": {
 			files: map[string]string{
 				"test-one.md": "# Test 1\nSome content",
-				"test 2.md":   "# Test 2\nMore content",
+				"2.md":        "# Test 2\nMore content",
 			},
 			wantErr: false,
 			checkFn: func(t *testing.T, tr *trie.Trie) {
@@ -35,9 +35,9 @@ func TestInit(t *testing.T) {
 					t.Errorf("Expected to find test-one.md in trie, got %v", results)
 				}
 
-				results = tr.Search("test 2")
-				if !slices.Contains(results, "test 2.md") {
-					t.Errorf("Expected to find \"test 2.md\" in trie, got %v", results)
+				results = tr.Search("2")
+				if !slices.Contains(results, "2.md") {
+					t.Errorf("Expected to find \"2.md\" in trie, got %v", results)
 				}
 			},
 		},
