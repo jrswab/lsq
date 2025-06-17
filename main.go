@@ -17,7 +17,7 @@ import (
 	"github.com/jrswab/lsq/trie"
 )
 
-const semVer string = "1.3.0"
+const semVer string = "1.4.0"
 
 // Search regex pattern in given file, print matching lines
 func searchInFile(filePath string, pattern *regexp.Regexp) error {

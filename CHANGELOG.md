@@ -7,9 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2024-06-16
+### Added
+- Ability to use numbers when searchning with `-f`
+
 ## [1.3.0] - 2025-05-20
 ### Added
-- release.yml workflow to automatically create binaries on each new release.
+- The `release.yml` workflow to automatically create binaries on each new release.
 
 ### Changed
 - Searching with `lsq -f <word>` now encompasses Unicode characters and not only a-z.
