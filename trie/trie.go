@@ -159,13 +159,13 @@ func removeNonAlpha(fileName string) string {
 	s = strings.ReplaceAll(s, ".org", "")
 
 	// Step 3: Keep only letter characters
-	letters := []rune{}
+	uniRune := []rune{}
 	for _, r := range s {
-		if unicode.IsLetter(r) {
-			letters = append(letters, r)
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			uniRune = append(uniRune, r)
 		}
 	}
-	s = string(letters)
+	s = string(uniRune)
 
 	// NFC = Normalization Form Canonical Composition
 	// This ensures that characters like "é" are treated consistently
