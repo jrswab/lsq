@@ -61,8 +61,10 @@ func main() {
 
 	apndStdin := flag.Bool("A", false, "Append STDIN to the current journal page. This will not open $EDITOR.")
 	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR.")
+	catFile := flag.Bool("c", false, "Print journal or page content to STDOUT instead of opening an editor.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
 	cliSearch := flag.String("f", "", "Search by file name in your pages directory.")
+	daysAgo := flag.Int("n", 0, "Number of days ago to target for the journal entry.")
 	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
 	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extension.")
 	regexSearch := flag.String("r", "", "Search by regex pattern in pages directory.")
@@ -75,6 +77,11 @@ func main() {
 	if *version {
 		fmt.Println(semVer)
 		os.Exit(0)
+	}
+
+	if *daysAgo < 0 {
+		fmt.Fprintln(os.Stderr, "Error: -n must be a non-negative integer")
+		os.Exit(1)
 	}
 
 	if *apndStdin {
@@ -108,6 +115,15 @@ func main() {
 
 	if *pageToOpen != "" {
 		pagePath := filepath.Join(cfg.PagesDir, *pageToOpen)
+
+		// Print page content to STDOUT and exit.
+		if *catFile {
+			if err := system.PrintFile(pagePath); err != nil {
+				log.Printf("Error printing page: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
 
 		// Append to page and exit.
 		if *apnd != "" {
@@ -190,10 +206,24 @@ func main() {
 		*specDate = time.Now().Add(-24 * time.Hour).Format("2006-01-02")
 	}
 
+	// When -n is provided, compute the date N days ago.
+	if *daysAgo > 0 {
+		*specDate = time.Now().AddDate(0, 0, -*daysAgo).Format("2006-01-02")
+	}
+
 	journalPath, err := system.GetJournal(cfg, cfg.JournalsDir, *specDate)
 	if err != nil {
 		log.Printf("Error setting journal path: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Print journal content to STDOUT and exit.
+	if *catFile {
+		if err := system.PrintFile(journalPath); err != nil {
+			log.Printf("Error printing journal: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	if *apnd != "" {

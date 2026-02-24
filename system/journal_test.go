@@ -2,6 +2,7 @@ package system_test
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,6 +124,77 @@ func TestBasicJournalCreation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrintFile(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "test-print")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	tests := []struct {
+		name        string
+		content     string
+		expectError bool
+	}{
+		{
+			name:        "print file with content",
+			content:     "- journal entry one\n- journal entry two\n",
+			expectError: false,
+		},
+		{
+			name:        "print empty file",
+			content:     "",
+			expectError: false,
+		},
+		{
+			name:        "print file with unicode",
+			content:     "- 测试 Test テスト\n",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testFile := filepath.Join(tmpDir, fmt.Sprintf("%s.md", tt.name))
+			if err := os.WriteFile(testFile, []byte(tt.content), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			// Capture stdout by replacing os.Stdout with a pipe
+			oldStdout := os.Stdout
+			r, w, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			os.Stdout = w
+
+			printErr := system.PrintFile(testFile)
+
+			w.Close()
+			captured, _ := io.ReadAll(r)
+			r.Close()
+			os.Stdout = oldStdout
+
+			if (printErr != nil) != tt.expectError {
+				t.Errorf("PrintFile() error = %v, expectError %v", printErr, tt.expectError)
+				return
+			}
+
+			if string(captured) != tt.content {
+				t.Errorf("Expected %q, got %q", tt.content, string(captured))
+			}
+		})
+	}
+
+	// Test with a non-existent file
+	t.Run("non-existent file", func(t *testing.T) {
+		err := system.PrintFile(filepath.Join(tmpDir, "does_not_exist.md"))
+		if err == nil {
+			t.Error("Expected error for non-existent file, got nil")
+		}
+	})
 }
 
 func TestAppendToFile(t *testing.T) {
