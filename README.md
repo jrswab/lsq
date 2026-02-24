@@ -22,7 +22,8 @@ The ultra-fast CLI companion for [Logseq](https://github.com/logseq/logseq) desi
 - Automatic journal file creation
 - Support for both Markdown and Org formats
 - Configurable file naming format
-- Customizable directory location
+- Customizable directory location with `~` and environment variable support
+- STDOUT output mode for shell scripting and widget integration
 - User defined configuration file
 
 ## Ready to Start?
@@ -41,9 +42,12 @@ lsq
 ### Command Line Options
 - `-a`: Append text directly to the current journal page
 - `-A`: Append the contents of STDIN to the current journal page
-- `-d`: Specify main directory path. (example: `/home/jrswab/Documents/Notes`)
+- `-c`: Print journal or page content to STDOUT instead of opening an editor.
+- `-d`: Specify main directory path. Supports `~` and environment variables. (example: `~/Documents/Notes`)
 - `-e`: Set editor to use while editing files. (Defaults to $EDITOR, then Vim if $EDITOR is not set)
 - `-f`: Search pages and aliases. Must be followed by a string.
+- `-i`: Set the indentation level (number of tabs) for appended text. Requires `-a` or `-A`.
+- `-n`: Number of days ago to target for the journal entry. (example: `-n 3` targets the journal from 3 days ago)
 - `-o`: Automatically open the first result from the search.
 - `-p`: Open a specific page from the pages directory.
 - `-r`: Search pages and journals via regex pattern. Must be followed by a regex string.
@@ -70,7 +74,8 @@ The configuration file will override any lsq defaults which are defined. If a CL
   ;; Using the format below and the file type above will produce 2025.01.01.md
   :file/format "yyyy_MM_dd"
   ;; The directory which holds all your notes
-  :directory "/home/jaron/Logseq"
+  ;; Supports ~ and environment variables (e.g., ~/Logseq or $HOME/Logseq)
+  :directory "~/Logseq"
 }
 ```
 **Note:** The configured directory must contain both a `journals` and `pages` subdirectory for lsq to function properly. These are automatically created when using Logseq, but will need to be manually created if setting lsq to use a new directory or without Logseq.
@@ -106,6 +111,23 @@ run_long_batch_job |& lsq -A -p "long-job.$(date +%s).log"
 ```
 This will run your long-running batch job, and it'll append the contents of STDIN
 and STDERR (note the pipe!) to a new page called `long-job.UNIX_TIMESTAMP.log`.
+
+```bash
+lsq -c
+```
+This prints today's journal content to STDOUT without opening an editor.
+Useful for shell integration, piping to other tools, or display widgets.
+
+```bash
+lsq -c -n 3
+```
+This prints the journal from 3 days ago to STDOUT.
+
+```bash
+lsq -a "sub-item text" -i 1
+```
+This appends text as an indented bullet (one tab level deep), creating a nested
+list item in Logseq. Use `-i 2` for two levels deep, and so on.
 
 ## Contributing
 For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).
