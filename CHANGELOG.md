@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-02-24
+### Added
+- `-c` flag to print journal or page content to STDOUT instead of opening an editor.
+- `-n` flag to target a journal entry from N days ago.
+- `-i` flag to set indentation level (number of tabs) for appended text via `-a` or `-A`.
+- Support for `~` and environment variables in directory paths (config and `-d` flag).
+
+### Fixed
+- Guard against negative indent in `AppendToFile` to prevent panic.
+
+### Changed
+- Updated README with new flags, usage examples, and tilde/env var documentation.
+
 ## [1.4.0] - 2024-06-16
 ### Added
 - Ability to use numbers when searchning with `-f`
