@@ -64,6 +64,10 @@ func PrintFile(path string) error {
 }
 
 func AppendToFile(path, content string, indent int) error {
+	if indent < 0 {
+		return fmt.Errorf("invalid indent: %d", indent)
+	}
+
 	prefix := strings.Repeat("\t", indent)
 	bc := fmt.Sprintf("%s- %s\n", prefix, content)
 

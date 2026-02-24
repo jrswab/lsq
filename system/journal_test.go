@@ -349,6 +349,14 @@ func TestAppendToFile(t *testing.T) {
 			expectedResult: "- existing content\n\t- hello\tworld\n",
 			expectError:    false,
 		},
+		{
+			name:           "negative indent returns error",
+			initialContent: "",
+			appendContent:  "text",
+			indent:         -1,
+			expectedResult: "",
+			expectError:    true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -367,6 +375,10 @@ func TestAppendToFile(t *testing.T) {
 			// Check error expectation
 			if (err != nil) != tt.expectError {
 				t.Errorf("AppendToFile() error = %v, expectError %v", err, tt.expectError)
+				return
+			}
+
+			if tt.expectError {
 				return
 			}
 
