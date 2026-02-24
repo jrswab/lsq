@@ -64,6 +64,7 @@ func main() {
 	catFile := flag.Bool("c", false, "Print journal or page content to STDOUT instead of opening an editor.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
 	cliSearch := flag.String("f", "", "Search by file name in your pages directory.")
+	indent := flag.Int("i", 0, "Absolute indentation level (number of tab characters) for appended text. Requires -a or -A.")
 	daysAgo := flag.Int("n", 0, "Number of days ago to target for the journal entry.")
 	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
 	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extension.")
@@ -81,6 +82,16 @@ func main() {
 
 	if *daysAgo < 0 {
 		fmt.Fprintln(os.Stderr, "Error: -n must be a non-negative integer")
+		os.Exit(1)
+	}
+
+	if *indent < 0 {
+		fmt.Fprintln(os.Stderr, "Error: indentation level must be zero or greater")
+		os.Exit(1)
+	}
+
+	if *indent > 0 && *apnd == "" && !*apndStdin {
+		fmt.Fprintln(os.Stderr, "Error: -i requires -a or -A")
 		os.Exit(1)
 	}
 
@@ -127,7 +138,7 @@ func main() {
 
 		// Append to page and exit.
 		if *apnd != "" {
-			err := system.AppendToFile(pagePath, *apnd)
+			err := system.AppendToFile(pagePath, *apnd, *indent)
 			if err != nil {
 				log.Printf("Error appending data to file: %v\n", err)
 				os.Exit(1)
@@ -227,7 +238,7 @@ func main() {
 	}
 
 	if *apnd != "" {
-		err := system.AppendToFile(journalPath, *apnd)
+		err := system.AppendToFile(journalPath, *apnd, *indent)
 		if err != nil {
 			log.Printf("Error appending data to file: %v\n", err)
 			os.Exit(1)

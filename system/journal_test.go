@@ -208,6 +208,7 @@ func TestAppendToFile(t *testing.T) {
 		name           string
 		initialContent string
 		appendContent  string
+		indent         int
 		expectedResult string
 		expectError    bool
 	}{
@@ -215,6 +216,7 @@ func TestAppendToFile(t *testing.T) {
 			name:           "new empty file",
 			initialContent: "",
 			appendContent:  "new content",
+			indent:         0,
 			expectedResult: "- new content\n",
 			expectError:    false,
 		},
@@ -222,6 +224,7 @@ func TestAppendToFile(t *testing.T) {
 			name:           "append to file with content and newline",
 			initialContent: "- existing content\n",
 			appendContent:  "new content",
+			indent:         0,
 			expectedResult: "- existing content\n- new content\n",
 			expectError:    false,
 		},
@@ -229,6 +232,7 @@ func TestAppendToFile(t *testing.T) {
 			name:           "append to file without trailing newline",
 			initialContent: "- existing content",
 			appendContent:  "new content",
+			indent:         0,
 			expectedResult: "- existing content\n- new content\n",
 			expectError:    false,
 		},
@@ -236,6 +240,7 @@ func TestAppendToFile(t *testing.T) {
 			name:           "append empty content",
 			initialContent: "- existing content\n",
 			appendContent:  "",
+			indent:         0,
 			expectedResult: "- existing content\n- \n",
 			expectError:    false,
 		},
@@ -243,6 +248,7 @@ func TestAppendToFile(t *testing.T) {
 			name:           "append content with special characters",
 			initialContent: "- existing content\n",
 			appendContent:  "content with * and - and #",
+			indent:         0,
 			expectedResult: "- existing content\n- content with * and - and #\n",
 			expectError:    false,
 		},
@@ -250,8 +256,106 @@ func TestAppendToFile(t *testing.T) {
 			name:           "append multiple lines",
 			initialContent: "- existing content\n",
 			appendContent:  "line1\nline2",
+			indent:         0,
 			expectedResult: "- existing content\n- line1\nline2\n",
 			expectError:    false,
+		},
+		// Indentation test cases
+		{
+			name:           "indent level 0 explicit",
+			initialContent: "- existing content\n",
+			appendContent:  "text",
+			indent:         0,
+			expectedResult: "- existing content\n- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 1",
+			initialContent: "- existing content\n",
+			appendContent:  "text",
+			indent:         1,
+			expectedResult: "- existing content\n\t- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 2",
+			initialContent: "- existing content\n",
+			appendContent:  "text",
+			indent:         2,
+			expectedResult: "- existing content\n\t\t- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 3",
+			initialContent: "- existing content\n",
+			appendContent:  "#work/org",
+			indent:         3,
+			expectedResult: "- existing content\n\t\t\t- #work/org\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 1 empty file",
+			initialContent: "",
+			appendContent:  "text",
+			indent:         1,
+			expectedResult: "\t- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 2 empty file",
+			initialContent: "",
+			appendContent:  "text",
+			indent:         2,
+			expectedResult: "\t\t- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 1 no trailing newline",
+			initialContent: "- existing content",
+			appendContent:  "text",
+			indent:         1,
+			expectedResult: "- existing content\n\t- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 2 no trailing newline",
+			initialContent: "- existing content",
+			appendContent:  "text",
+			indent:         2,
+			expectedResult: "- existing content\n\t\t- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent level 5",
+			initialContent: "- existing content\n",
+			appendContent:  "text",
+			indent:         5,
+			expectedResult: "- existing content\n\t\t\t\t\t- text\n",
+			expectError:    false,
+		},
+		{
+			name:           "indent with empty content",
+			initialContent: "- existing content\n",
+			appendContent:  "",
+			indent:         1,
+			expectedResult: "- existing content\n\t- \n",
+			expectError:    false,
+		},
+		{
+			name:           "indent with special characters in content",
+			initialContent: "- existing content\n",
+			appendContent:  "hello\tworld",
+			indent:         1,
+			expectedResult: "- existing content\n\t- hello\tworld\n",
+			expectError:    false,
+		},
+		{
+			name:           "negative indent returns error",
+			initialContent: "",
+			appendContent:  "text",
+			indent:         -1,
+			expectedResult: "",
+			expectError:    true,
 		},
 	}
 
@@ -266,11 +370,15 @@ func TestAppendToFile(t *testing.T) {
 				}
 			}
 
-			err := system.AppendToFile(testFile, tt.appendContent)
+			err := system.AppendToFile(testFile, tt.appendContent, tt.indent)
 
 			// Check error expectation
 			if (err != nil) != tt.expectError {
 				t.Errorf("AppendToFile() error = %v, expectError %v", err, tt.expectError)
+				return
+			}
+
+			if tt.expectError {
 				return
 			}
 
