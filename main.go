@@ -96,7 +96,12 @@ func main() {
 
 	// When this flag is used override the config.
 	if *lsqDirPath != "" {
-		cfg.DirPath = *lsqDirPath
+		expanded, expandErr := config.ExpandPath(*lsqDirPath)
+		if expandErr != nil {
+			log.Printf("Error expanding directory path: %v\n", expandErr)
+			os.Exit(1)
+		}
+		cfg.DirPath = expanded
 		cfg.JournalsDir = filepath.Join(cfg.DirPath, "journals")
 		cfg.PagesDir = filepath.Join(cfg.DirPath, "pages")
 	}
