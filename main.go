@@ -64,7 +64,7 @@ func main() {
 	catFile := flag.Bool("c", false, "Print journal or page content to STDOUT instead of opening an editor.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
 	cliSearch := flag.String("f", "", "Search by file name in your pages directory.")
-	daysAgo := flag.Int("n", 0, "Number of days ago. Used with -c to print a past journal to STDOUT.")
+	daysAgo := flag.Int("n", 0, "Number of days ago to target for the journal entry.")
 	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
 	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extension.")
 	regexSearch := flag.String("r", "", "Search by regex pattern in pages directory.")
@@ -77,6 +77,11 @@ func main() {
 	if *version {
 		fmt.Println(semVer)
 		os.Exit(0)
+	}
+
+	if *daysAgo < 0 {
+		fmt.Fprintln(os.Stderr, "Error: -n must be a non-negative integer")
+		os.Exit(1)
 	}
 
 	if *apndStdin {
