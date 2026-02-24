@@ -52,6 +52,17 @@ func GetJournal(cfg *config.Config, journalsDir, specDate string) (string, error
 	return path, nil
 }
 
+// PrintFile reads the file at path and writes its contents to STDOUT.
+// Returns an error if the file cannot be read.
+func PrintFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("error reading file: %w", err)
+	}
+	_, err = os.Stdout.Write(data)
+	return err
+}
+
 func AppendToFile(path, content string) error {
 	bc := fmt.Sprintf("- %s\n", content)
 

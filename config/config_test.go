@@ -53,10 +53,8 @@ func TestConvertDateFormat(t *testing.T) {
 }
 
 func TestExpandPath(t *testing.T) {
-	// Save and restore HOME so tilde expansion uses a known value.
-	origHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", origHome)
-	os.Setenv("HOME", "/home/alice")
+	// Set HOME so tilde expansion uses a known value.
+	t.Setenv("HOME", "/home/alice")
 
 	tests := map[string]struct {
 		input   string

@@ -38,10 +38,10 @@ func Load() (*Config, error) {
 	cfgPath := filepath.Join(configDir, "lsq", "config.edn")
 
 	data, dErr := os.ReadFile(cfgPath)
-	if err != nil && !os.IsNotExist(err) {
+	if dErr != nil && !os.IsNotExist(dErr) {
 		// The user has a config file but we couldn't read it.
 		// Report the error instead of ignoring their configuration.
-		return nil, fmt.Errorf("error reading config file: %v\n", err)
+		return nil, fmt.Errorf("error reading config file: %v\n", dErr)
 	}
 
 	homeDir, err := os.UserHomeDir()
