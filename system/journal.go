@@ -63,8 +63,9 @@ func PrintFile(path string) error {
 	return err
 }
 
-func AppendToFile(path, content string) error {
-	bc := fmt.Sprintf("- %s\n", content)
+func AppendToFile(path, content string, indent int) error {
+	prefix := strings.Repeat("\t", indent)
+	bc := fmt.Sprintf("%s- %s\n", prefix, content)
 
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
@@ -93,9 +94,9 @@ func AppendToFile(path, content string) error {
 		return fmt.Errorf("error reading last byte: %w", err)
 	}
 
-	// When theh last byte is not a new line add it to the bulleted content
+	// When the last byte is not a new line add it to the bulleted content
 	if buf[0] != '\n' {
-		bc = fmt.Sprintf("\n- %s\n", content)
+		bc = fmt.Sprintf("\n%s- %s\n", prefix, content)
 	}
 
 	// Write data to the file
