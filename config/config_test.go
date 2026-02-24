@@ -52,27 +52,152 @@ func TestConvertDateFormat(t *testing.T) {
 	}
 }
 
+func TestExpandPath(t *testing.T) {
+	// Save and restore HOME so tilde expansion uses a known value.
+	origHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", origHome)
+	os.Setenv("HOME", "/home/alice")
+
+	tests := map[string]struct {
+		input   string
+		envVars map[string]string // extra env vars to set for this test
+		want    string
+	}{
+		// FR-1: Tilde expansion
+		"tilde with subpath": {
+			input: "~/Documents/Logseq",
+			want:  "/home/alice/Documents/Logseq",
+		},
+		"tilde only": {
+			input: "~",
+			want:  "/home/alice",
+		},
+		"tilde with trailing slash": {
+			input: "~/",
+			want:  "/home/alice/",
+		},
+		"tilde mid-path not expanded": {
+			input: "/data/~backup/notes",
+			want:  "/data/~backup/notes",
+		},
+
+		// FR-2: Environment variable expansion
+		"env var HOME": {
+			input: "$HOME/Documents/Logseq",
+			want:  "/home/alice/Documents/Logseq",
+		},
+		"env var braced HOME": {
+			input: "${HOME}/Logseq",
+			want:  "/home/alice/Logseq",
+		},
+		"env var custom": {
+			input:   "$XDG_DATA_HOME/logseq",
+			envVars: map[string]string{"XDG_DATA_HOME": "/home/alice/.local/share"},
+			want:    "/home/alice/.local/share/logseq",
+		},
+
+		// FR-3: Combined tilde and env var
+		"tilde then env var": {
+			input:   "~/$PROJECT/Logseq",
+			envVars: map[string]string{"PROJECT": "work"},
+			want:    "/home/alice/work/Logseq",
+		},
+
+		// FR-5: No-op for absolute paths
+		"absolute path unchanged": {
+			input: "/home/alice/Logseq",
+			want:  "/home/alice/Logseq",
+		},
+
+		// FR-6: Empty string
+		"empty string": {
+			input: "",
+			want:  "",
+		},
+
+		// Edge cases from spec
+		"undefined env var expands to empty": {
+			input: "$LSQ_TEST_UNDEFINED_VAR_XYZ/Logseq",
+			want:  "/Logseq",
+		},
+		"relative path unchanged": {
+			input: "Documents/Logseq",
+			want:  "Documents/Logseq",
+		},
+		"tilde with username not expanded": {
+			input: "~bob/Logseq",
+			want:  "~bob/Logseq",
+		},
+		"double tilde not expanded": {
+			input: "~~",
+			want:  "~~",
+		},
+		"env var then tilde mid-path": {
+			input: "$HOME/~/data",
+			want:  "/home/alice/~/data",
+		},
+		"only env var": {
+			input: "$HOME",
+			want:  "/home/alice",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Set any extra env vars for this test case, then clean up.
+			for k, v := range tt.envVars {
+				orig := os.Getenv(k)
+				os.Setenv(k, v)
+				defer os.Setenv(k, orig)
+			}
+			// Unset the undefined var to be sure.
+			os.Unsetenv("LSQ_TEST_UNDEFINED_VAR_XYZ")
+
+			got, err := config.ExpandPath(tt.input)
+			if err != nil {
+				t.Fatalf("ExpandPath(%q) returned error: %v", tt.input, err)
+			}
+			if got != tt.want {
+				t.Errorf("ExpandPath(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestConfigLoad(t *testing.T) {
-	// Create a temporary test directory
+	// Create a temporary test directory to act as HOME.
 	tempDir, err := os.MkdirTemp("", "lsq-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	cfgPath := filepath.Join("lsq", "config.edn")
+	// Resolve the config directory that os.UserConfigDir() will return
+	// when HOME is set to tempDir. On macOS this is $HOME/Library/Application Support;
+	// on Linux with XDG_CONFIG_HOME it is XDG_CONFIG_HOME directly.
+	origConfigDir := os.Getenv("XDG_CONFIG_HOME")
+	origHomeDir := os.Getenv("HOME")
+	os.Setenv("XDG_CONFIG_HOME", tempDir)
+	os.Setenv("HOME", tempDir)
+	resolvedConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatalf("Failed to resolve config directory: %v", err)
+	}
+	os.Setenv("XDG_CONFIG_HOME", origConfigDir)
+	os.Setenv("HOME", origHomeDir)
+
+	// cfgPath is relative to resolvedConfigDir; setupFiles keys are relative to resolvedConfigDir.
+	cfgRelPath := filepath.Join("lsq", "config.edn")
 
 	testCases := []struct {
-		name          string
-		xdgConfigHome string
-		setupFiles    map[string][]byte
-		expectedCfg   config.Config
-		expectError   bool
+		name        string
+		setupFiles  map[string][]byte // paths relative to resolvedConfigDir
+		expectedCfg config.Config
+		expectError bool
 	}{
 		{
-			name:          "No existing lsq config, load defaults",
-			xdgConfigHome: tempDir,
-			setupFiles:    map[string][]byte{},
+			name:       "No existing lsq config, load defaults",
+			setupFiles: map[string][]byte{},
 			expectedCfg: config.Config{
 				Version:     1,
 				FileFmt:     "yyyy_MM_dd",
@@ -84,10 +209,9 @@ func TestConfigLoad(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:          "Valid XDG config with existing lsq config",
-			xdgConfigHome: tempDir,
+			name: "Valid config with existing lsq config",
 			setupFiles: map[string][]byte{
-				cfgPath: []byte(`{:file/type "Markdown"
+				cfgRelPath: []byte(`{:file/type "Markdown"
                               :file/format "yyyy_MM_dd"
                               :directory "/custom/path"}`),
 			},
@@ -102,12 +226,41 @@ func TestConfigLoad(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:          "Invalid EDN in lsq config",
-			xdgConfigHome: tempDir,
+			name: "Invalid EDN in lsq config",
 			setupFiles: map[string][]byte{
-				cfgPath: []byte(`invalid edn`),
+				cfgRelPath: []byte(`invalid edn`),
 			},
 			expectError: true,
+		},
+		{
+			name: "Tilde in directory is expanded",
+			setupFiles: map[string][]byte{
+				cfgRelPath: []byte(`{:directory "~/Documents/Logseq"}`),
+			},
+			expectedCfg: config.Config{
+				Version:     1,
+				FileFmt:     "yyyy_MM_dd",
+				FileType:    "Markdown",
+				DirPath:     filepath.Join(tempDir, "Documents", "Logseq"),
+				JournalsDir: filepath.Join(tempDir, "Documents", "Logseq", "journals"),
+				PagesDir:    filepath.Join(tempDir, "Documents", "Logseq", "pages"),
+			},
+			expectError: false,
+		},
+		{
+			name: "Env var in directory is expanded",
+			setupFiles: map[string][]byte{
+				cfgRelPath: []byte(`{:directory "$HOME/Documents/Logseq"}`),
+			},
+			expectedCfg: config.Config{
+				Version:     1,
+				FileFmt:     "yyyy_MM_dd",
+				FileType:    "Markdown",
+				DirPath:     filepath.Join(tempDir, "Documents", "Logseq"),
+				JournalsDir: filepath.Join(tempDir, "Documents", "Logseq", "journals"),
+				PagesDir:    filepath.Join(tempDir, "Documents", "Logseq", "pages"),
+			},
+			expectError: false,
 		},
 	}
 
@@ -126,9 +279,13 @@ func TestConfigLoad(t *testing.T) {
 			os.Setenv("XDG_CONFIG_HOME", tempDir)
 			os.Setenv("HOME", tempDir)
 
-			// Create test files
-			for path, content := range tc.setupFiles {
-				fullPath := filepath.Join(tempDir, path)
+			// Clean up any config files from prior subtests.
+			lsqCfgDir := filepath.Join(resolvedConfigDir, "lsq")
+			os.RemoveAll(lsqCfgDir)
+
+			// Create test files relative to the resolved config directory.
+			for relPath, content := range tc.setupFiles {
+				fullPath := filepath.Join(resolvedConfigDir, relPath)
 
 				err := os.MkdirAll(filepath.Dir(fullPath), 0755)
 				if err != nil {
