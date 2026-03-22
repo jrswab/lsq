@@ -72,10 +72,20 @@ Phase 2 includes:
 
 ### Phase 3
 
-Add a tiny local file-backed simple-query DSL that works natively offline over fields that can be recovered reliably from filesystem files.
-*Rationale: Phase 3 remains highly valuable because it provides offline/local capability and lays the crucial foundational parser/index work moving forward.*
+Add intermediate follow-up support to recognize and safely strip outer `{{query ...}}` wrappers surrounding pure simple DSL logic before submitting to `logseq.DB.q`.
+*Rationale: Providing this macro stripping enables immediate user-visible value by allowing Logseq UI macro configurations to be pasted natively into the terminal without manually stripping the text syntax, while strictly enforcing boundaries against advanced EDN formats.*
 
 Phase 3 includes:
+- recognition of `{{query ...}}` wrapped macro strings for simple queries
+- targeted wrapper stripping safely bypassing CLI layer for valid simple DSL only
+- strict validation avoiding arbitrary `{:query ...}` shapes
+
+### Phase 4
+
+Add a tiny local file-backed simple-query DSL that works natively offline over fields that can be recovered reliably from filesystem files.
+*Rationale: Phase 4 remains highly valuable because it provides offline/local capability and lays the crucial foundational parser/index work moving forward.*
+
+Phase 4 includes:
 - a small `simple` Markdown parser
 - a local file index targeting `--graph-dir`
 - local execution for a restricted set of simple predicates
@@ -114,7 +124,14 @@ lsq query simple --expr '[[logseq]]' --backend http
 lsq query simple --expr '(task now)' --backend http --format json
 ```
 
-Phase 3 commands:
+Phase 3 commands (Macro Stripping):
+
+```bash
+lsq query simple --expr '{{query (task now)}}'
+lsq query simple --expr '{{query (and [[logseq]] #TypeScript)}}'
+```
+
+Phase 4 commands:
 
 ```bash
 lsq query simple --expr 'ref:project-x and marker:TODO' --backend file --graph-dir ~/graph
@@ -133,7 +150,7 @@ Supported flags added in Phase 2:
 
 - `--expr`
 
-Supported flags added in Phase 3:
+Supported flags added in Phase 4:
 
 - `--backend file`
 - `--graph-dir`
@@ -151,11 +168,16 @@ Phase 2 supports raw simple DSL expressions passed through to `logseq.DB.q`:
 - `(task now)`
 - `(between [[jan 1st, 2026]] [[mar 31st, 2026]])`
 
-Phase 3 introduces a separate local offline simple DSL parsing local filesystem targets.
+Phase 3 supports simple DSL wrapped inside macros by stripping the macros safely:
+- `{{query [[logseq]]}}` -> `[[logseq]]`
+- `{{query (task now)}}` -> `(task now)`
+- Invalid outputs fail quickly (e.g. `{{query {:query [:find ...]}}}`) via local error handling.
 
-The Phase 3 local simple DSL is intentionally not the same thing as `{{query ...}}` nor full Logseq query macros. It is an `lsq` offline DSL.
+Phase 4 introduces a separate local offline simple DSL parsing local filesystem targets.
 
-Phase 3 local offline DSL:
+The Phase 4 local simple DSL is intentionally not the same thing as `{{query ...}}` nor full Logseq query macros. It is an `lsq` offline DSL.
+
+Phase 4 local offline DSL:
 - `ref:<page-name>`
 - `tag:<tag-name>`
 - `marker:TODO|DOING|DONE`
@@ -214,7 +236,7 @@ Advanced queries should be routed exclusively to `logseq.DB.datascriptQuery`, wi
 
 The file backend is explicitly out of scope for Phase 1.
 
-When it is introduced in Phase 3, it should only execute a restricted local DSL over fields that can be recovered reliably from files.
+When it is introduced in Phase 4, it should only execute a restricted local DSL over fields that can be recovered reliably from files.
 
 The file backend must not assume local availability of:
 
@@ -227,7 +249,7 @@ Those assumptions were removed from this revision because the current repo does 
 
 ## Query Plan Model
 
-An internal plan model is still useful, but only for Phase 3 and beyond.
+An internal plan model is still useful, but only for Phase 4 and beyond.
 
 The plan model should remain intentionally narrow:
 
@@ -248,14 +270,14 @@ type Filter struct {
 }
 ```
 
-Phase 3 local fields:
+Phase 4 local fields:
 
 - `block.content`
 - `block.marker`
 - `block.refs`
 - `block.tags`
 
-Phase 3 local operators:
+Phase 4 local operators:
 
 - `and`
 - `or`
@@ -326,16 +348,28 @@ Phase 1 explicitly does not attempt file fallback for advanced queries.
 Phase 2 relies entirely on the HTTP HTTP bindings established in Phase 1. It explicitly passes simple DSL syntax exclusively mapped to Logseq's `DB.q` API endpoint natively passing payloads upstream.
 
 Explicit exclusions:
-- `{{query ...}}` macro formatting natively unstripped. Stripping should be manually omitted from Phase 2 unless specifically wrapped around pure DSL tokens.
+- `{{query ...}}` macro formatting natively unstripped. Stripping should be manually omitted from Phase 2.
 - Advanced EDN/DataLog syntaxes.
 - Offline File backend parses.
 - Org files.
 
 ## Phase 3 Detailed Scope
 
-Phase 3 begins following HTTP simple validation completions in Phase 2.
+Phase 3 intercepts remote `query simple` commands to examine input strings for `{{query \s*(.*?)\s*}}`. If found:
+1. Strips the wrapper.
+2. Evaluates if the inner payload resembles pure simple query DSL strings `(`, `[` and strictly avoids property or EDN-like tokens (`{`, `:inputs`, `:query`, etc).
+3. If valid, forwards to Phase 2 HTTP execution `logseq.DB.q`.
+4. If invalid, the CLI fails closed avoiding incorrect remote execution parameters.
 
-Phase 3 builds a local file-backed offline query path for a tiny DSL only.
+Phase 3 avoids supporting:
+- `#+BEGIN_QUERY ... #+END_QUERY`
+- advanced query wrappers
+
+## Phase 4 Detailed Scope
+
+Phase 4 begins following HTTP simple validation completions in Phase 2.
+
+Phase 4 builds a local file-backed offline query path for a tiny DSL only.
 
 Local parsing requirements:
 - parse block tree shape well enough to preserve parent-child structure
@@ -372,7 +406,7 @@ Phase 1 package additions:
 - `./query/backend/httpapi/client.go`
 - `./query/backend/httpapi/execute.go`
 
-Phase 3 additions:
+Phase 4 additions:
 
 - `./query/types.go`
 - `./query/parser/simple.go`
@@ -382,7 +416,7 @@ Phase 3 additions:
 - `./query/backend/file/index.go`
 - `./query/backend/file/execute.go`
 
-Org support is not Phase 3 by default. It should be a later follow-up unless real user demand appears.
+Org support is not Phase 4 by default. It should be a later follow-up unless real user demand appears.
 
 ## Testing Strategy
 
@@ -407,7 +441,7 @@ CLI routing coverage:
 - `lsq query simple --expr ...`
 - `--backend auto`
 
-### Phase 3
+### Phase 4
 
 Simple parser tests:
 
@@ -448,7 +482,8 @@ Recommended order:
 3. add structured output
 4. add `auto` backend for HTTP-only routing
 5. map remote `query simple` targeting `DB.q` over HTTP (Phase 2)
-6. only then start Phase 3 local offline DSL execution (Phase 3)
+6. implement intermediate follow-up simple macro stripping (Phase 3)
+7. only then start Phase 4 local offline DSL execution (Phase 4)
 
 This revision intentionally trades breadth for implementability.
 
