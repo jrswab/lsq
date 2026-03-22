@@ -64,23 +64,14 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	// Validate backend.
-	switch *backend {
-	case "auto", "http":
-		// Phase 1: "auto" resolves to "http".
-	default:
-		fmt.Fprintf(stderr, "unsupported backend %q: must be one of auto, http\n", *backend)
-		return 1
-	}
-
 	// Dispatch subcommand.
 	switch subcommand {
 	case "doctor":
-		return runDoctor(context.Background(), *format, *apiURL, *tokenEnv, stdout, stderr)
+		return runDoctor(context.Background(), *format, *backend, *apiURL, *tokenEnv, stdout, stderr)
 	case "advanced":
-		return runAdvanced(context.Background(), *format, *apiURL, *tokenEnv, *queryStr, *queryFile, stdout, stderr)
+		return runAdvanced(context.Background(), *format, *backend, *apiURL, *tokenEnv, *queryStr, *queryFile, stdout, stderr)
 	case "simple":
-		return runSimple(context.Background(), *format, *apiURL, *tokenEnv, *expr, stdout, stderr)
+		return runSimple(context.Background(), *format, *backend, *apiURL, *tokenEnv, *expr, stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query <doctor|advanced|simple> [flags]\n", subcommand)
 		return 1
@@ -88,7 +79,12 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 // runDoctor probes the Logseq HTTP API and prints the doctor result.
-func runDoctor(ctx context.Context, format, apiURL, tokenEnv string, stdout, stderr io.Writer) int {
+func runDoctor(ctx context.Context, format, backend, apiURL, tokenEnv string, stdout, stderr io.Writer) int {
+	if err := validateHTTPBackend(backend); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+
 	// Resolve the token from the environment variable.
 	token := ""
 	if tokenEnv != "" {
@@ -118,7 +114,12 @@ func runDoctor(ctx context.Context, format, apiURL, tokenEnv string, stdout, std
 }
 
 // runAdvanced executes a raw advanced query through the HTTP API.
-func runAdvanced(ctx context.Context, format, apiURL, tokenEnv, queryStr, queryFile string, stdout, stderr io.Writer) int {
+func runAdvanced(ctx context.Context, format, backend, apiURL, tokenEnv, queryStr, queryFile string, stdout, stderr io.Writer) int {
+	if err := validateHTTPBackend(backend); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+
 	// Normalize both inputs: trim whitespace so a blank-only value is
 	// treated as absent, matching the file-input trimming behavior.
 	queryStr = strings.TrimSpace(queryStr)
@@ -176,7 +177,7 @@ func runAdvanced(ctx context.Context, format, apiURL, tokenEnv, queryStr, queryF
 }
 
 // runSimple executes a raw simple DSL expression through the HTTP API.
-func runSimple(ctx context.Context, format, apiURL, tokenEnv, expr string, stdout, stderr io.Writer) int {
+func runSimple(ctx context.Context, format, backend, apiURL, tokenEnv, expr string, stdout, stderr io.Writer) int {
 	expr = strings.TrimSpace(expr)
 	if expr == "" {
 		fmt.Fprintln(stderr, "error: --expr is required for simple queries")
@@ -192,7 +193,16 @@ func runSimple(ctx context.Context, format, apiURL, tokenEnv, expr string, stdou
 		Timeout: DefaultHTTPTimeout,
 	})
 
-	result := httpapi.RunSimpleQuery(ctx, client, expr)
+	// Defer dispatch logic out of the command layer and down to the router.
+	execHTTP := func(ctx context.Context, expr string) query.AdvancedResult {
+		return httpapi.RunSimpleQuery(ctx, client, expr)
+	}
+
+	result, err := query.RunSimple(ctx, backend, expr, execHTTP)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
 
 	out, err := query.RenderResult(format, result)
 	if err != nil {
@@ -206,4 +216,13 @@ func runSimple(ctx context.Context, format, apiURL, tokenEnv, expr string, stdou
 		return 1
 	}
 	return 0
+}
+
+func validateHTTPBackend(backend string) error {
+	switch backend {
+	case "auto", "http":
+		return nil
+	default:
+		return fmt.Errorf("unsupported backend %q: must be one of auto, http", backend)
+	}
 }
