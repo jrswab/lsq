@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jrswab/lsq/query"
 )
@@ -49,7 +50,7 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 					return res
 				}
 				// datascriptQuery reached the server but failed at method layer.
-				msg := "both query methods failed"
+				msg := bothFailedMsg(dbqErr, dsErr)
 				res.Error = &msg
 				return res
 			}
@@ -82,7 +83,7 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 			}
 			// Both methods failed at method layer → reachable but no capabilities.
 			setAuthSucceeded(&res)
-			msg := "both query methods failed"
+			msg := bothFailedMsg(dbqErr, dsErr)
 			res.Error = &msg
 			return res
 		}
@@ -165,4 +166,15 @@ func setAuthSucceeded(res *query.DoctorResult) {
 	if res.Auth.Configured {
 		res.Auth.Succeeded = true
 	}
+}
+
+// bothFailedMsg produces an actionable error message when both query
+// methods fail. It includes the underlying error text from each method
+// so the user can distinguish "method not supported" from "server error"
+// without having to re-run with --explain or debug logging.
+func bothFailedMsg(dbqErr, dsErr error) string {
+	return fmt.Sprintf(
+		"both query methods failed: logseq.DB.q: %s; logseq.DB.datascriptQuery: %s",
+		dbqErr, dsErr,
+	)
 }

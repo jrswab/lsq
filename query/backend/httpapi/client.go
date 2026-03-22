@@ -126,34 +126,82 @@ func (c *Client) ProbeDatascriptQuery(ctx context.Context) error {
 
 // isProbeSuccess applies the narrowest defensible validation for a probe
 // response. The Logseq HTTP API does not have a formally documented
-// success/error envelope, so we use a conservative heuristic:
+// success/error envelope, so we use a conservative heuristic.
 //
-//   - If the response is a JSON object with a top-level "error" key whose
-//     value is a non-null, non-empty string, treat it as failure.
-//   - Everything else (arrays, scalars, objects without "error") is treated
-//     as success.
+// Decision table (applied in order):
 //
-// This catches the common pattern where Logseq returns {"error":"method not found"}
-// while still accepting legitimate scalar/array results.
+//	| Response shape                              | Result  | Rationale
+//	|---------------------------------------------|---------|------------------------------------------
+//	| empty body                                  | FAIL    | no data returned
+//	| non-object (array, number, string, bool)    | SUCCESS | legitimate query results
+//	| unparseable object                           | FAIL    | corrupted response
+//	| {"error": "non-empty string"}               | FAIL    | string error envelope
+//	| {"error": {"message": "..."}}               | FAIL    | structured error object
+//	| {"error": 123} (non-null, non-string)       | FAIL    | non-string error value
+//	| {"error": ""} or {"error": null}            | SUCCESS | empty/null error = no error
+//	| {"ok": false, ...} or {"success": false, ...}| FAIL   | boolean failure indicator
+//	| object without "error" key                  | SUCCESS | legitimate object result
+//
+// This heuristic is intentionally isolated so it can be revised after
+// real Logseq API validation (see ValidateAgainstReal).
+//
+// TODO(real-api): After testing against a real Logseq instance, refine
+// this function based on observed success/error response shapes.
 func isProbeSuccess(raw json.RawMessage) bool {
 	if len(raw) == 0 {
 		return false
 	}
-	// Only inspect JSON objects; arrays and scalars are valid results.
+	// Non-object responses (arrays, scalars) are valid query results.
 	if raw[0] != '{' {
 		return true
 	}
-	var envelope struct {
-		Error *string `json:"error"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
+
+	// Parse the object into a generic map so we can inspect the "error"
+	// value regardless of its JSON type (string, object, number, etc.).
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &obj); err != nil {
 		return false
 	}
-	// A non-nil, non-empty error string means failure.
-	if envelope.Error != nil && *envelope.Error != "" {
+
+	// Check for boolean failure indicators: {"ok":false} or {"success":false}.
+	if boolFlagFalse(obj, "ok") || boolFlagFalse(obj, "success") {
 		return false
 	}
-	return true
+
+	// Check the "error" field if present.
+	errRaw, hasError := obj["error"]
+	if !hasError {
+		return true
+	}
+
+	// null → no error.
+	if string(errRaw) == "null" {
+		return true
+	}
+
+	// Try to unmarshal as string. Empty string → no error.
+	var errStr string
+	if json.Unmarshal(errRaw, &errStr) == nil {
+		return errStr == ""
+	}
+
+	// Error is present and is neither null nor an empty string
+	// (could be an object like {"message":"..."}, a number, etc.).
+	// Treat any non-null, non-empty-string "error" value as failure.
+	return false
+}
+
+// boolFlagFalse returns true if obj[key] exists and is the JSON boolean false.
+func boolFlagFalse(obj map[string]json.RawMessage, key string) bool {
+	raw, ok := obj[key]
+	if !ok {
+		return false
+	}
+	var val bool
+	if json.Unmarshal(raw, &val) != nil {
+		return false
+	}
+	return !val
 }
 
 // TransportError indicates a connectivity-level failure (connection refused,
@@ -189,6 +237,38 @@ type MethodError struct {
 
 func (e *MethodError) Error() string {
 	return fmt.Sprintf("method error (status %d): %s", e.StatusCode, e.Body)
+}
+
+// ValidateAgainstReal documents the checks that must be performed against a
+// real Logseq HTTP API instance to confirm the probe heuristic is correct.
+// This function is a no-op in production; it serves as an explicit seam
+// for future runtime validation and as a living checklist.
+//
+// When validating against a real Logseq instance, verify:
+//
+// TODO(real-api): 1. What HTTP status does Logseq return for an unsupported
+//   method name? (e.g. "logseq.DB.nonexistent") — expected: 200 + error
+//   envelope, or non-200?
+//
+// TODO(real-api): 2. What is the exact JSON shape of a successful DB.q
+//   response? Is it always an array, or can it be a scalar/object?
+//
+// TODO(real-api): 3. What is the exact JSON shape of a DB.q error response?
+//   Is it {"error":"string"}, {"error":{"message":"..."}}, or something
+//   else?
+//
+// TODO(real-api): 4. Does logseq.DB.datascriptQuery use the same
+//   request/response envelope as logseq.DB.q?
+//
+// TODO(real-api): 5. Does the Logseq API require auth by default, or only
+//   when explicitly enabled? What status code is returned on auth failure?
+//
+// TODO(real-api): 6. Is the probe query [:find ?e . :where [?e :block/uuid]]
+//   safe and fast on large graphs? Should we use a different probe query?
+func ValidateAgainstReal() {
+	// Intentional no-op. This function exists as a documentation seam.
+	// After real-instance testing, the TODOs above should be resolved and
+	// isProbeSuccess updated accordingly.
 }
 
 // truncate returns at most n bytes of b as a string.

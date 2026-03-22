@@ -322,6 +322,96 @@ func TestProbeDBQ_ScalarResult200(t *testing.T) {
 	}
 }
 
+func TestProbeDBQ_ErrorObjectEnvelope200(t *testing.T) {
+	// 200 with {"error": {"message": "..."}} — structured error object.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":{"message":"method not supported","code":404}}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for 200 + error object envelope, got nil")
+	}
+}
+
+func TestProbeDBQ_NumericErrorValue200(t *testing.T) {
+	// 200 with {"error": 500} — numeric error value.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":500}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for 200 + numeric error, got nil")
+	}
+}
+
+func TestProbeDBQ_OkFalseEnvelope200(t *testing.T) {
+	// 200 with {"ok": false, "error": "something"} — boolean flag.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":false,"error":"something went wrong"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for 200 + ok:false, got nil")
+	}
+}
+
+func TestProbeDBQ_SuccessFalseEnvelope200(t *testing.T) {
+	// 200 with {"success": false, "error": "..."} — boolean flag.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"success":false,"error":"query engine unavailable"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for 200 + success:false, got nil")
+	}
+}
+
+func TestProbeDBQ_OkTrueWithResult200(t *testing.T) {
+	// 200 with {"ok": true, "result": [...]} — should succeed.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":true,"result":[["page-a"]]}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err != nil {
+		t.Fatalf("expected success for ok:true envelope, got %v", err)
+	}
+}
+
+func TestProbeDBQ_ResultWithNonBoolOk200(t *testing.T) {
+	// 200 with {"ok": "yes"} — non-boolean ok is ignored (treated as success).
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"ok":"yes","data":42}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err != nil {
+		t.Fatalf("expected success for non-boolean ok field, got %v", err)
+	}
+}
+
 // --- RunDoctor tests ---
 
 func TestRunDoctor_AllHealthy(t *testing.T) {
@@ -466,7 +556,6 @@ func TestRunDoctor_DBQFailedDatascriptWorks(t *testing.T) {
 func TestRunDoctor_BothMethodsFail_ReachableTrue(t *testing.T) {
 	// FIX VERIFICATION: Both methods return 500 (method-layer error).
 	// API IS reachable — only capabilities are missing.
-	// The old code reported reachable=false here; the fix reports reachable=true.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, `{"error":"broken"}`)
@@ -486,10 +575,17 @@ func TestRunDoctor_BothMethodsFail_ReachableTrue(t *testing.T) {
 		t.Error("expected capabilities.datascript_query=false")
 	}
 	if res.Error == nil {
-		t.Error("expected error to be set")
+		t.Fatal("expected error to be set")
 	}
 	if !res.Auth.Succeeded {
 		t.Error("expected auth.succeeded=true (server responded, no auth error)")
+	}
+	// Verify the error message includes context from both methods.
+	if !strings.Contains(*res.Error, "logseq.DB.q") {
+		t.Errorf("expected error to mention logseq.DB.q, got %q", *res.Error)
+	}
+	if !strings.Contains(*res.Error, "logseq.DB.datascriptQuery") {
+		t.Errorf("expected error to mention logseq.DB.datascriptQuery, got %q", *res.Error)
 	}
 }
 
@@ -515,7 +611,11 @@ func TestRunDoctor_BothMethodsReturnErrorEnvelope200(t *testing.T) {
 		t.Error("expected capabilities.datascript_query=false for error envelope")
 	}
 	if res.Error == nil {
-		t.Error("expected error to be set")
+		t.Fatal("expected error to be set")
+	}
+	// Verify message is actionable: includes both method names.
+	if !strings.Contains(*res.Error, "logseq.DB.q") || !strings.Contains(*res.Error, "logseq.DB.datascriptQuery") {
+		t.Errorf("expected actionable error with both method names, got %q", *res.Error)
 	}
 }
 
