@@ -1,7 +1,10 @@
 package integration
 
 import (
+	"bytes"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 )
@@ -92,5 +95,52 @@ func (h *TestHelper) AssertFileExists(path string, expectedContent string) {
 
 	if string(content) != expectedContent {
 		h.t.Errorf("File content mismatch.\nExpected:\n%s\nGot:\n%s", expectedContent, content)
+	}
+}
+
+// BuildBinary compiles the lsq binary from the module root and returns the
+// path to the compiled executable. It is safe to call from TestMain.
+// The caller is responsible for removing the returned file when done.
+func BuildBinary(moduleRoot string) (string, error) {
+	out := filepath.Join(os.TempDir(), fmt.Sprintf("lsq_integration_test_%d", os.Getpid()))
+	cmd := exec.Command("go", "build", "-o", out, ".")
+	cmd.Dir = moduleRoot
+	cmd.Stdout = os.Stderr // build output goes to test stderr
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("build failed: %w", err)
+	}
+	return out, nil
+}
+
+// CLIResult captures the output and exit code of a CLI invocation.
+type CLIResult struct {
+	Stdout   string
+	Stderr   string
+	ExitCode int
+}
+
+// RunCLI executes the binary at binaryPath with the given arguments and
+// optional environment additions, returning captured output and exit code.
+// env entries are in "KEY=VALUE" form and are appended to the current env.
+func RunCLI(binaryPath string, args []string, env ...string) CLIResult {
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), env...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	code := 0
+	if err != nil {
+		if exit, ok := err.(*exec.ExitError); ok {
+			code = exit.ExitCode()
+		} else {
+			code = -1
+		}
+	}
+	return CLIResult{
+		Stdout:   stdout.String(),
+		Stderr:   stderr.String(),
+		ExitCode: code,
 	}
 }
