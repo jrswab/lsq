@@ -130,3 +130,38 @@ func TestQuerySimpleCLI_NullResponse_IsError(t *testing.T) {
 		t.Errorf("expected results to be explicitly null, got %v", m["results"])
 	}
 }
+
+func TestQuerySimpleCLI_ErrorEnvelope_IsError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":"Unsupported block property"}`)
+	}))
+	defer srv.Close()
+
+	res := RunCLI(lsqBinary, []string{
+		"query", "simple",
+		"--expr", "{{query [[logseq]]}}",
+		"--format", "json",
+		"--api-url", srv.URL + "/api",
+	})
+
+	// 200 + {"error": ...} should be treated as an error by simple query execution.
+	if res.ExitCode != 1 {
+		t.Fatalf("expected exit code 1 for error envelope, got %d", res.ExitCode)
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal([]byte(res.Stdout), &m); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, res.Stdout)
+	}
+
+	if m["error"] == nil {
+		t.Error("expected error field to be populated")
+	} else if errStr, ok := m["error"].(string); !ok || !strings.Contains(errStr, `{"error":"Unsupported block property"}`) {
+		t.Errorf("expected error containing error json payload, got %v", m["error"])
+	}
+
+	if m["results"] != nil {
+		t.Errorf("expected results to be explicitly null, got %v", m["results"])
+	}
+}

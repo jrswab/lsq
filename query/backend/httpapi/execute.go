@@ -156,6 +156,12 @@ func RunSimpleQuery(ctx context.Context, c *Client, expr string) query.AdvancedR
 			res.Results = json.RawMessage("null")
 			return res
 		}
+		if !isProbeSuccess(raw) {
+			msg := fmt.Sprintf("logseq.DB.q returned an error envelope: %s", truncate(raw, 200))
+			res.Error = &msg
+			res.Results = json.RawMessage("null")
+			return res
+		}
 		res.QueryMethod = "logseq.DB.q"
 		res.Results = raw
 		return res

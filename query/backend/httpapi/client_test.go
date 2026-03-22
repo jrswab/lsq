@@ -799,6 +799,9 @@ func TestRunSimpleQuery_NullResponseIsError(t *testing.T) {
 	if res.Error == nil {
 		t.Fatal("expected error on null response")
 	}
+	if !strings.Contains(*res.Error, "returned null") {
+		t.Errorf("expected error containing 'returned null', got %q", *res.Error)
+	}
 	if res.QueryMethod != "" {
 		t.Errorf("expected empty query_method on null response, got %q", res.QueryMethod)
 	}
@@ -806,6 +809,50 @@ func TestRunSimpleQuery_NullResponseIsError(t *testing.T) {
 		t.Errorf("expected null results on null response, got %s", res.Results)
 	}
 }
+
+func TestRunSimpleQuery_ErrorEnvelopeIsError(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":"Missing query property"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	// Testing arbitrary unsupported string passing
+	res := httpapi.RunSimpleQuery(context.Background(), c, "{{query [[logseq]]}}")
+
+	if res.Error == nil {
+		t.Fatal("expected error on 200 + error envelope JSON")
+	}
+	if !strings.Contains(*res.Error, `{"error":"Missing query property"}`) {
+		t.Errorf("expected parsed error string, got %q", *res.Error)
+	}
+	if string(res.Results) != "null" {
+		t.Errorf("expected explicitly null results, got %s", res.Results)
+	}
+}
+
+func TestRunSimpleQuery_ErrorObjectEnvelopeIsError(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":{"message":"Internal syntax error"}}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	res := httpapi.RunSimpleQuery(context.Background(), c, "foo")
+
+	if res.Error == nil {
+		t.Fatal("expected error on 200 + nested error envelope JSON")
+	}
+	if !strings.Contains(*res.Error, `{"error":{"message":"Internal syntax error"}}`) {
+		t.Errorf("expected parsed error string, got %q", *res.Error)
+	}
+	if string(res.Results) != "null" {
+		t.Errorf("expected explicitly null results, got %s", res.Results)
+	}
+}
+
 
 func TestRunSimpleQuery_ExpressionShapes(t *testing.T) {
 	// Verify various simple DSL expression shapes are forwarded correctly.
