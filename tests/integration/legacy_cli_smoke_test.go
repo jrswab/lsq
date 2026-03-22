@@ -78,3 +78,28 @@ func TestLegacyCLI_FindFile(t *testing.T) {
 		t.Errorf("expected page filename in output, got: %s", res.Stdout)
 	}
 }
+
+func TestLegacyCLI_FindAlias(t *testing.T) {
+	helper := NewTestHelper(t)
+	defer helper.Cleanup()
+
+	// Setup config and a dummy page with an alias property.
+	configContent := []byte(`{:graph "` + helper.LogseqDir + `"}`)
+	os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644)
+
+	pagePath := filepath.Join(helper.PagesDir, "Original Target.md")
+	// The lsq trie parses properties, including alias::.
+	os.WriteFile(pagePath, []byte("alias:: Secret Keyword\n\n- some content\n"), 0644)
+
+	// Invoke lsq -f to search by the alias.
+	res := RunCLI(lsqBinary, []string{"-f", "Secret Keyword"})
+
+	if res.ExitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d. stderr: %s", res.ExitCode, res.Stderr)
+	}
+
+	// Output should contain the path to the original file that holds the alias.
+	if !strings.Contains(res.Stdout, "Original Target.md") {
+		t.Errorf("expected original page filename in output for alias search, got: %s", res.Stdout)
+	}
+}
