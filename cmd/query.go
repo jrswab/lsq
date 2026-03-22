@@ -30,7 +30,7 @@ const (
 // args would be ["doctor", "--format", "json"].
 func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: lsq query <doctor|advanced> [flags]")
+		fmt.Fprintln(stderr, "usage: lsq query doctor [flags]")
 		return 1
 	}
 
@@ -74,7 +74,7 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	case "doctor":
 		return runDoctor(context.Background(), *format, *apiURL, *tokenEnv, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query <doctor|advanced> [flags]\n", subcommand)
+		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query doctor [flags]\n", subcommand)
 		return 1
 	}
 }

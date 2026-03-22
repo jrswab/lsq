@@ -149,8 +149,13 @@ func TestRunQuery_NoSubcommand(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected exit code 1, got %d", code)
 	}
-	if !strings.Contains(stderr.String(), "usage:") {
-		t.Errorf("expected usage in stderr, got: %s", stderr.String())
+	errText := stderr.String()
+	if !strings.Contains(errText, "usage: lsq query doctor") {
+		t.Errorf("expected usage for doctor in stderr, got: %s", errText)
+	}
+	// Must not claim advanced is available in Task 3.
+	if strings.Contains(errText, "advanced") {
+		t.Errorf("usage must not mention 'advanced' in Task 3, got: %s", errText)
 	}
 }
 
@@ -164,8 +169,16 @@ func TestRunQuery_UnknownSubcommand(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected exit code 1, got %d", code)
 	}
-	if !strings.Contains(stderr.String(), "unknown query subcommand") {
-		t.Errorf("expected unknown subcommand error, got: %s", stderr.String())
+	errText := stderr.String()
+	if !strings.Contains(errText, "unknown query subcommand") {
+		t.Errorf("expected unknown subcommand error, got: %s", errText)
+	}
+	// Usage hint must reflect the current surface, not imply advanced exists.
+	if !strings.Contains(errText, "usage: lsq query doctor") {
+		t.Errorf("expected usage for doctor in error hint, got: %s", errText)
+	}
+	if strings.Contains(errText, "advanced") {
+		t.Errorf("usage hint must not mention 'advanced' in Task 3, got: %s", errText)
 	}
 }
 
