@@ -637,3 +637,114 @@ func TestRunQuery_AdvancedStillWorksAfterSimple(t *testing.T) {
 	}
 }
 
+func TestRunQuery_SimpleMacroSupported(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+			Args   []any  `json:"args"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		if len(req.Args) == 0 || req.Args[0] != "(task now)" {
+			t.Errorf("expected stripped payload '(task now)', got %v", req.Args)
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[{"block/marker":"NOW"}]`)
+	}))
+	defer srv.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "{{query (task now)}}", "--format", "json", "--api-url", srv.URL + "/api"},
+		&stdout, &stderr,
+	)
+
+	if code != 0 {
+		t.Fatalf("exit code %d; stderr: %s", code, stderr.String())
+	}
+}
+
+func TestRunQuery_SimpleMacroSupported_PageProperty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Args []any `json:"args"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		if len(req.Args) == 0 || req.Args[0] != "(page-property type project)" {
+			t.Errorf("expected stripped payload '(page-property type project)', got %v", req.Args)
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[]`)
+	}))
+	defer srv.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "{{query (page-property type project)}}", "--format", "json", "--api-url", srv.URL + "/api"},
+		&stdout, &stderr,
+	)
+
+	if code != 0 {
+		t.Fatalf("exit code %d; stderr: %s", code, stderr.String())
+	}
+}
+
+func TestRunQuery_SimpleMacroRejected_Maps(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "{{query {:query [:find ?b]}}}"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for map input, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "cannot contain maps") {
+		t.Errorf("expected map rejection error, got: %s", stderr.String())
+	}
+}
+
+func TestRunQuery_SimpleMacroRejected_Datalog(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "{{query [:find ?b]}}"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for datalog input, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "cannot contain Datalog") {
+		t.Errorf("expected datalog rejection error, got: %s", stderr.String())
+	}
+}
+
+func TestRunQuery_SimpleMacroRejected_BeginQuery(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "{{query #+BEGIN_QUERY\n[:find ?b]\n#+END_QUERY}}"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for BEGIN_QUERY input, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "cannot contain BEGIN_QUERY blocks") {
+		t.Errorf("expected BEGIN_QUERY rejection error, got: %s", stderr.String())
+	}
+}
+
+func TestRunQuery_SimpleMacroRejected_UnknownWrappedForm(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "{{query (do-something-else foo)}}"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for unknown wrapped form, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "supported simple DSL subset") {
+		t.Errorf("expected subset rejection error, got: %s", stderr.String())
+	}
+}
+

@@ -8,12 +8,24 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/jrswab/lsq/query"
 	"github.com/jrswab/lsq/query/backend/httpapi"
 )
+
+var simpleMacroWrapperPattern = regexp.MustCompile(`(?is)^{{query\s+(.*?)\s*}}$`)
+
+var allowedSimpleMacroInnerPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`^\[\[[^\[\]\n]+\]\]$`),
+	regexp.MustCompile(`^\(task\s+now\)$`),
+	regexp.MustCompile(`^\(and\s+.+\)$`),
+	regexp.MustCompile(`^\(or\s+.+\)$`),
+	regexp.MustCompile(`^\(between\s+\[\[[^\[\]\n]+\]\]\s+\[\[[^\[\]\n]+\]\]\)$`),
+	regexp.MustCompile(`^\(page-property\s+[^\s()]+\s+[^\s()]+\)$`),
+}
 
 // Default values for query flags.
 const (
@@ -184,6 +196,13 @@ func runSimple(ctx context.Context, format, backend, apiURL, tokenEnv, expr stri
 		return 1
 	}
 
+	normalized, err := normalizeSimpleExpr(expr)
+	if err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
+		return 1
+	}
+	expr = normalized
+
 	token := ""
 	if tokenEnv != "" {
 		token = os.Getenv(tokenEnv)
@@ -225,4 +244,46 @@ func validateHTTPBackend(backend string) error {
 	default:
 		return fmt.Errorf("unsupported backend %q: must be one of auto, http", backend)
 	}
+}
+
+// normalizeSimpleExpr provides Phase 3 macro stripping.
+// It recognizes an outer {{query ...}} wrapper, extracts the inner expression,
+// and strictly validates that it does not contain advanced EDN maps or config properties.
+func normalizeSimpleExpr(expr string) (string, error) {
+	// If it doesn't look like a macro, return as-is for Phase 2 compatibility.
+	if !strings.HasPrefix(strings.ToLower(expr), "{{query ") {
+		return expr, nil
+	}
+
+	matches := simpleMacroWrapperPattern.FindStringSubmatch(expr)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("unsupported macro syntax: invalid simple query macro wrapper")
+	}
+
+	inner := strings.TrimSpace(matches[1])
+
+	// Explicitly reject shapes that indicate advanced queries or render-layer config.
+	if strings.Contains(strings.ToUpper(inner), "BEGIN_QUERY") {
+		return "", fmt.Errorf("unsupported macro syntax: cannot contain BEGIN_QUERY blocks")
+	}
+	if strings.Contains(inner, "{") || strings.Contains(inner, "}") {
+		return "", fmt.Errorf("unsupported macro syntax: simple macros cannot contain maps or advanced configuration")
+	}
+	if strings.Contains(inner, "[:find") {
+		return "", fmt.Errorf("unsupported macro syntax: simple macros cannot contain Datalog")
+	}
+	if !isAcceptedSimpleMacroInner(inner) {
+		return "", fmt.Errorf("unsupported macro syntax: wrapped content is not in the supported simple DSL subset")
+	}
+
+	return inner, nil
+}
+
+func isAcceptedSimpleMacroInner(inner string) bool {
+	for _, pattern := range allowedSimpleMacroInnerPatterns {
+		if pattern.MatchString(inner) {
+			return true
+		}
+	}
+	return false
 }
