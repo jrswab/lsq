@@ -16,7 +16,7 @@ import (
 	"github.com/jrswab/lsq/query/backend/httpapi"
 )
 
-var simpleMacroWrapperPattern = regexp.MustCompile(`(?is)^{{query\s+(.*?)\s*}}$`)
+var simpleMacroWrapperPattern = regexp.MustCompile(`(?is)^{{\s*query\s+(.*?)\s*}}$`)
 
 var allowedSimpleMacroInnerPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^\[\[[^\[\]\n]+\]\]$`),
@@ -250,8 +250,8 @@ func validateHTTPBackend(backend string) error {
 // It recognizes an outer {{query ...}} wrapper, extracts the inner expression,
 // and strictly validates that it does not contain advanced EDN maps or config properties.
 func normalizeSimpleExpr(expr string) (string, error) {
-	// If it doesn't look like a macro, return as-is for Phase 2 compatibility.
-	if !strings.HasPrefix(strings.ToLower(expr), "{{query ") {
+	// If it doesn't look like a macro at all, return as-is for Phase 2 compatibility.
+	if !strings.HasPrefix(expr, "{{") {
 		return expr, nil
 	}
 
