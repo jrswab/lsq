@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- `lsq query doctor` command to check Logseq HTTP API reachability and capabilities.
+- `lsq query advanced` command for executing raw advanced Datalog queries.
+- Structured output options for query commands: `text`, `json`, and `ndjson`.
+- Support for providing queries via inline `--query` string or `--file` path.
 
 ## [1.5.0] - 2026-02-24
 ### Added

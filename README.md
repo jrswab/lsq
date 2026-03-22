@@ -129,6 +129,39 @@ lsq -a "sub-item text" -i 1
 This appends text as an indented bullet (one tab level deep), creating a nested
 list item in Logseq. Use `-i 2` for two levels deep, and so on.
 
+## HTTP Query
+`lsq query` adds read-only Logseq HTTP query support. It complements the core file-based CLI and currently works only against an active Logseq HTTP Server.
+
+### Requirements
+- Logseq must be running.
+- In Logseq, Settings → Features, enable the **HTTP Server**.
+- An API token (via `--api-token-env`, defaults to `LOGSEQ_API_TOKEN`) is needed **only if** the HTTP server requires authentication.
+- The API URL defaults to `http://127.0.0.1:12315/api` and can be overridden with `--api-url`.
+
+### Commands
+Test the API connection and capabilities:
+```bash
+lsq query doctor
+```
+
+Execute raw advanced Datalog queries:
+```bash
+lsq query advanced --query '[:find ?name :where [?p :block/name ?name]]'
+lsq query advanced --file ./my_query.edn
+```
+
+### Output Formats
+Available via `--format <format>`:
+- `text` (default): Human-readable CLI output.
+- `json`: Structured JSON result envelope (e.g., `{"backend": "http", "results": [...]}`).
+- `ndjson`: Newline-delimited JSON. `doctor` prints one line; `advanced` expands result rows only when the result is a warning-free array.
+
+### Current Limitations
+- Query support is currently HTTP-only.
+- No support for simple queries.
+- `--backend` currently accepts `auto` or `http`, though both resolve to HTTP.
+- `--explain` is parsed but not yet implemented.
+
 ## Contributing
 For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).
 
