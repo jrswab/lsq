@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jrswab/lsq/cmd"
 	"github.com/jrswab/lsq/config"
 	"github.com/jrswab/lsq/system"
 	"github.com/jrswab/lsq/trie"
@@ -56,6 +57,12 @@ func searchInDirectory(directory string, pattern *regexp.Regexp) error {
 }
 
 func main() {
+	// Intercept "query" subcommand before standard flag parsing.
+	// This keeps the query path completely independent from legacy flags.
+	if len(os.Args) > 1 && os.Args[1] == "query" {
+		os.Exit(cmd.RunQuery(os.Args[2:], os.Stdout, os.Stderr))
+	}
+
 	// File Path Override
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
 
