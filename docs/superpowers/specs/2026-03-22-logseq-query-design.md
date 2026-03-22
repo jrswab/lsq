@@ -2,180 +2,140 @@
 
 Date: 2026-03-22
 Repo: `/Users/tr/Workspace/logseq/logseq-clis/lsq`
-Status: Proposed
+Status: Proposed, revised after review
 
 ## Goal
 
-Extend `lsq` from a file-oriented Logseq CLI into a query-capable CLI that can:
+Extend `lsq` with query support in a way that is deliverable for the current codebase.
 
-- execute real Logseq advanced queries when the Logseq HTTP API is available
-- execute a useful subset of Logseq-style queries against local `pages/` and `journals/` files when HTTP API access is unavailable
-- preserve existing `lsq` behavior for journal/page open, append, and search operations
+The immediate objective is not to build a full local Logseq query engine. The immediate objective is:
 
-This design deliberately separates:
+- let `lsq` execute real Logseq advanced queries through the local HTTP API when available
+- add a small, explicit diagnostic surface so the user can tell whether query execution is possible
+- preserve all existing `lsq` behaviors for journal/page opening, appending, and file-oriented search
 
-- input compatibility with Logseq query syntax
-- internal query planning
-- execution backends
+## Current Reality
 
-That separation is required because `lsq` currently has no graph database, no block model, and no Datalog engine.
+Today `lsq` is a small Go CLI centered on file operations.
+
+It currently supports:
+
+- opening or creating journal files
+- opening a page by filename
+- appending bullet content to journals and pages
+- printing page or journal content
+- filename and `alias::` prefix search
+- regex scanning across raw files
+
+Relevant code:
+
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/main.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/system/journal.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/trie/trie.go`
+
+It does not currently have:
+
+- a block AST
+- a page/block index
+- a Datalog engine
+- a local model for refs, tags, page properties, or query planning
+
+That matters because a realistic v1 must fit this starting point.
+
+## Product Direction
+
+The design is split into phases.
+
+### Phase 1
+
+Deliver real advanced query support by delegating to Logseq's HTTP API.
+
+Phase 1 includes:
+
+- `lsq query doctor`
+- `lsq query advanced --query ...`
+- `lsq query advanced --file ...`
+- `--backend http|auto`
+- structured output for success, warnings, and backend selection
+
+Phase 1 does not include a local query engine.
+
+### Phase 2
+
+Add a tiny local simple-query DSL that works only on fields that can be recovered reliably from files.
+
+Phase 2 includes:
+
+- a small `simple` parser
+- a local file index
+- local execution for a restricted set of predicates
+
+### Phase 3
+
+Add optional compilation of a limited advanced-query subset into the local plan model.
+
+This ordering is intentional. It avoids turning `lsq` into a half-finished query platform before the repo has the right primitives.
 
 ## Non-goals
 
 The first implementation will not:
 
-- fully reimplement Logseq's complete DataScript/Datalog engine
-- guarantee full parity between file graphs and DB graphs
-- support every advanced query feature such as `:rules`, arbitrary `:in`, or custom Clojure predicates
-- replace current `-f` and `-r` behavior
-
-## Current State
-
-`lsq` currently supports:
-
-- open/create journal files
-- open pages by filename
-- append bullet content to journals/pages
-- print page/journal content
-- search page filenames and `alias::`
-- regex scan raw file contents
-
-Relevant code:
-
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/main.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/trie/trie.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/system/journal.go`
-
-`lsq` does not currently parse block structure, page properties, refs, tags, task markers, or advanced query syntax.
-
-## Product Direction
-
-The recommended direction is a dual-backend query system:
-
-1. `http` backend
-Calls Logseq's local HTTP API and uses native query capabilities such as `logseq.DB.q` and `logseq.DB.datascriptQuery` when available.
-
-2. `file` backend
-Builds a local index from `pages/` and `journals/` and executes a restricted subset of query semantics locally.
-
-3. `auto` backend
-Prefers HTTP for advanced query execution and falls back to the file backend only when compatible.
-
-This gives `lsq` a fast path to real Logseq Query support without blocking on a full local engine.
+- fully reimplement Logseq's DataScript/Datalog engine
+- guarantee parity between HTTP-backed results and file-backed results
+- support every advanced query construct such as `:rules`, arbitrary `:in`, custom predicates, or unrestricted joins
+- silently emulate unsupported advanced queries locally
+- replace existing `-f` and `-r` behavior
 
 ## CLI Design
 
-Introduce a new subcommand family instead of overloading the current flat flag interface.
+Add a query subcommand family rather than pushing more behavior into the existing flat flag interface.
 
-Examples:
+Phase 1 commands:
 
 ```bash
 lsq query doctor
-lsq query simple --expr '[[project-x]] and marker:TODO'
-lsq query simple --expr '#reading and journal:true' --backend file --format json
 lsq query advanced --query '[:find (pull ?b [*]) :where [?b :block/marker "TODO"]]'
-lsq query advanced --file ./query.edn --backend http
-lsq query auto --expr '{{query (and [[project-x]] (task todo))}}' --explain
+lsq query advanced --file ./query.edn
+lsq query advanced --query '[:find ?name :where [?p :block/name ?name]]' --backend http --format json
 ```
 
-Supported flags:
+Phase 2 commands:
 
-- `--backend auto|http|file`
+```bash
+lsq query simple --expr 'ref:project-x and marker:TODO'
+lsq query simple --expr 'tag:reading and marker:DONE' --backend file
+```
+
+Supported flags in Phase 1:
+
+- `--backend auto|http`
 - `--format text|json|ndjson`
-- `--limit N`
-- `--page <name>`
-- `--journals-only`
-- `--include-children`
 - `--explain`
 - `--api-url`
 - `--api-token-env`
 
-Behavior:
+Supported flags added in Phase 2:
 
-- `simple` accepts a compact query DSL and optionally `{{query ...}}`
-- `advanced` accepts raw EDN/Datalog strings or a file path
-- `auto` infers whether the input is simple or advanced and routes accordingly
-- `doctor` validates backend availability and capability
+- `--backend file`
+- `--limit N`
 
-## Query IR
+## Input Model
 
-The system will use an internal intermediate representation rather than executing each input syntax directly.
+The original draft mixed two incompatible meanings of "simple query". That is removed here.
 
-The IR is not a full Datalog AST. It is a constrained query plan that can be executed by either backend when possible.
+Phase 1 supports one input kind only:
 
-Illustrative shape:
+- raw advanced query text, passed through to Logseq HTTP API
 
-```go
-type QueryPlan struct {
-    Target      TargetKind
-    Filters     []Filter
-    Select      []FieldRef
-    Sort        []SortSpec
-    Limit       int
-    Offset      int
-    Include     IncludeSpec
-    SourceHint  SourceHint
-    RawInput    string
-    InputKind   InputKind
-    BackendHint BackendKind
-}
+Phase 2 introduces a separate local simple DSL.
 
-type Filter struct {
-    Op       FilterOp
-    Field    FieldRef
-    Value    Value
-    Children []Filter
-}
-```
+The Phase 2 simple DSL is intentionally not the same thing as `{{query ...}}`. It is an `lsq` DSL for local execution.
 
-First-pass fields:
+Phase 2 local DSL:
 
-- `block.content`
-- `block.marker`
-- `block.refs`
-- `block.tags`
-- `block.properties.<key>`
-- `block.page`
-- `block.page_journal`
-- `block.scheduled`
-- `block.deadline`
-- `block.created_at`
-- `block.updated_at`
-- `page.name`
-- `page.original_name`
-- `page.journal`
-- `page.properties.<key>`
-
-First-pass filter operators:
-
-- `and`
-- `or`
-- `not`
-- `eq`
-- `contains`
-- `in`
-- `has-ref`
-- `has-tag`
-- `exists`
-- `before`
-- `after`
-- `between`
-- `regex`
-
-## Input Compatibility
-
-### Simple Query Input
-
-The first version of the simple parser should support:
-
-- `[[page]]`
-- `#tag`
-- `property:key=value`
-- `marker:TODO|DOING|DONE|NOW|LATER|WAITING`
-- `page:<name>`
-- `journal:true|false`
-- `scheduled:<date-expr>`
-- `deadline:<date-expr>`
+- `ref:<page-name>`
+- `tag:<tag-name>`
+- `marker:TODO|DOING|DONE`
 - `text:"..."`
 - `and`
 - `or`
@@ -183,267 +143,256 @@ The first version of the simple parser should support:
 
 Examples:
 
-- `[[project-x]] and marker:TODO`
-- `#reading and journal:true and after:2026-03-01`
-- `property:status=active and not marker:DONE`
+- `ref:project-x and marker:TODO`
+- `tag:reading and not marker:DONE`
+- `text:"distributed systems" and marker:DOING`
 
-### Advanced Query Input
+Not supported in the local DSL for the first local phase:
 
-Advanced queries split into two categories.
+- `{{query ...}}`
+- `scheduled:...`
+- `deadline:...`
+- date arithmetic
+- `NOW`, `LATER`, `WAITING`
+- page-level property filtering
 
-Category A: passthrough-compatible
-
-- raw advanced query strings sent directly to Logseq HTTP API
-- preferred whenever `http` backend is available
-
-Category B: locally compilable subset
-
-The file backend will only support advanced query forms that can be mapped to the IR, such as:
-
-- `:find` with simple scalar or pull targets
-- `:where` clauses over known block/page fields
-- marker, ref, page, journal, and property filtering
-- time filters
-- basic `not`, `contains?`, and `re-find`
-
-The following remain explicitly unsupported in file backend v1:
-
-- `:rules`
-- arbitrary `:in`
-- custom predicates
-- unrestricted joins
-- arbitrary Clojure forms
-- deep `pull` projections
-
-Unsupported constructs must produce explicit errors. Silent partial execution is not acceptable.
+The restriction to `TODO|DOING|DONE` is deliberate and matches the repo's existing TODO model in `/Users/tr/Workspace/logseq/logseq-clis/lsq/todo/todo.go`.
 
 ## Backend Strategy
 
 ### HTTP Backend
 
-Purpose:
-
-- detect API availability
-- detect `DB.q` capability
-- run native Logseq advanced queries
-- optionally run Logseq text search APIs
+Phase 1 depends on the local Logseq HTTP API as the authoritative execution backend for advanced queries.
 
 Responsibilities:
 
-- `Ping()`
-- `SupportsDBQuery()`
-- `RunDBQuery(raw string)`
-- `RunSearch(raw string, opts)`
+- detect whether the API is reachable
+- detect whether database query methods are available
+- execute `logseq.DB.q` or `logseq.DB.datascriptQuery`
+- return machine-readable results and explicit failure modes
 
-The HTTP backend is the shortest path to genuine Logseq Query support and should be implemented before the local file backend.
+The Phase 1 backend contract should be written against the observed request shape used by third-party integrations in this workspace:
 
-### File Backend
+- endpoint: `POST /api`
+- request body:
 
-Purpose:
-
-- parse local Logseq files
-- construct an in-memory index
-- execute the restricted query subset without Logseq running
-
-The file backend becomes the durable core of `lsq`, but should not claim full parity with Logseq DB behavior.
-
-## File Graph Model
-
-The file backend needs a real block/page model.
-
-Illustrative model:
-
-```go
-type Page struct {
-    Name       string
-    Original   string
-    FilePath   string
-    Journal    bool
-    JournalDay *time.Time
-    Properties map[string]any
-    BlockIDs   []string
-}
-
-type Block struct {
-    ID         string
-    UUID       string
-    Content    string
-    Marker     string
-    Tags       []string
-    Refs       []string
-    Properties map[string]any
-    PageName   string
-    Journal    bool
-    Scheduled  *time.Time
-    Deadline   *time.Time
-    CreatedAt  *time.Time
-    UpdatedAt  *time.Time
-    Parent     string
-    Children   []string
-    Order      int
+```json
+{
+  "method": "logseq.DB.q",
+  "args": ["[:find ?name :where [?p :block/name ?name]]"]
 }
 ```
 
-Minimum indices:
+- auth: bearer token when configured
 
-- `pagesByName`
-- `blocksByID`
-- `blocksByPage`
-- `blocksByRef`
-- `blocksByTag`
-- `blocksByMarker`
-- `blocksByPropertyKey`
-- `journalPagesByDay`
+The implementation should also support `logseq.DB.datascriptQuery` as a fallback when appropriate.
 
-## Package Layout
+### File Backend
 
-Recommended package additions:
+The file backend is explicitly out of scope for Phase 1.
 
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/cmd/query.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/types.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/plan.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/result.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/parser/simple.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/parser/advanced.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/compile/simple_to_ir.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/compile/advanced_to_ir.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/execute.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/model.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/parser_markdown.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/parser_org.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/index.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/execute.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/dates.go`
+When it is introduced in Phase 2, it should only execute a restricted local DSL over fields that can be recovered reliably from files.
 
-## Routing Rules
+The file backend must not assume local availability of:
 
-Execution rules:
+- `block.created_at`
+- `block.updated_at`
+- block UUIDs for every block
+- full DB-style joinability
 
-1. parse input
-2. classify as `simple` or `advanced`
-3. choose backend
-4. execute or fail with a precise unsupported message
+Those assumptions were removed from this revision because the current repo does not have a stable source for them.
 
-Recommended behavior:
+## Query Plan Model
 
-- `backend=http`
-  - `advanced` queries go straight to `DB.q` or `datascriptQuery`
-  - `simple` queries may be executed locally or translated later
+An internal plan model is still useful, but only for Phase 2 and beyond.
 
-- `backend=file`
-  - `simple` queries execute locally
-  - `advanced` queries must first compile to IR
-  - unsupported advanced features fail explicitly
+The plan model should remain intentionally narrow:
 
-- `backend=auto`
-  - use HTTP when healthy and the query benefits from native DB execution
-  - otherwise use file backend
-  - never silently drop unsupported semantics
+```go
+type QueryPlan struct {
+    Target  TargetKind
+    Filters []Filter
+    Limit   int
+    RawInput string
+    InputKind InputKind
+}
 
-Warnings should be visible in `--format text` and structured in `json`/`ndjson`.
+type Filter struct {
+    Op       FilterOp
+    Field    FieldRef
+    Value    string
+    Children []Filter
+}
+```
 
-## Output Contract
+Phase 2 local fields:
 
-Provide stable machine-readable results.
+- `block.content`
+- `block.marker`
+- `block.refs`
+- `block.tags`
 
-Illustrative JSON shape:
+Phase 2 local operators:
+
+- `and`
+- `or`
+- `not`
+- `eq`
+- `contains`
+
+No time fields are part of the local plan model until the codebase has a reliable source for them.
+
+## Phase 1 Detailed Scope
+
+Phase 1 is considered complete when all of the following exist:
+
+1. `lsq query doctor`
+Reports:
+- whether HTTP API is reachable
+- whether auth succeeded
+- whether `logseq.DB.q` works
+- whether `logseq.DB.datascriptQuery` works
+
+2. `lsq query advanced`
+Accepts either raw query text or a file path and executes it remotely.
+
+3. `--backend auto`
+Uses HTTP if healthy. If not healthy, it returns a clear error.
+
+4. structured output
+Every command can return `text`, `json`, or `ndjson`.
+
+Illustrative JSON response:
 
 ```json
 {
   "backend": "http",
   "input_kind": "advanced",
-  "plan": {},
+  "query_method": "logseq.DB.q",
   "results": [],
   "warnings": [],
-  "unsupported": []
+  "error": null
 }
 ```
 
-Formats:
+Phase 1 explicitly does not attempt file fallback for advanced queries.
 
-- `text`
-- `json`
-- `ndjson`
+## Phase 2 Detailed Scope
 
-This makes the query system reusable by shell workflows, MCP wrappers, and other agents.
+Phase 2 begins only after Phase 1 works.
+
+Phase 2 builds a local file-backed query path for a tiny DSL only.
+
+Local parsing requirements:
+
+- parse block tree shape well enough to preserve parent-child structure
+- extract `TODO`, `DOING`, `DONE` markers
+- extract `[[page refs]]`
+- extract `#tags`
+- preserve source page and file path
+
+Local block model should stay minimal:
+
+```go
+type Block struct {
+    ID       string
+    Content  string
+    Marker   string
+    Tags     []string
+    Refs     []string
+    PageName string
+    Parent   string
+    Children []string
+    Order    int
+}
+```
+
+This is intentionally smaller than the original draft and matches what can be recovered from local files with reasonable confidence.
+
+## Package Layout
+
+Phase 1 package additions:
+
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/cmd/query.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/result.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/execute.go`
+
+Phase 2 additions:
+
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/types.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/parser/simple.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/compile/simple_to_plan.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/model.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/parser_markdown.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/index.go`
+- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/execute.go`
+
+Org support is not Phase 2 by default. It should be a later follow-up unless real user demand appears.
 
 ## Testing Strategy
 
-### CLI Routing
+### Phase 1
 
-- `lsq query doctor`
-- `lsq query advanced --backend http --query ...`
-- `lsq query simple --backend file --expr ...`
-- `lsq query auto --expr '{{query ...}}'`
+HTTP backend tests should use `httptest` and fixed fixtures.
 
-### Simple Parser
+Required coverage:
 
-- `[[foo]]`
-- `#foo and marker:TODO`
-- `property:status=active`
-- `not journal:true`
-- invalid syntax returns actionable errors
-
-### Advanced Parser and Classification
-
-- detect `[:find ... :where ...]`
-- detect `{{query ...}}`
-- distinguish passthrough-only vs compilable subset
-- reject `:rules`, complex `:in`, and arbitrary functions in file backend
-
-### HTTP Backend
-
-- health check
-- `DB.q` success
-- fallback to `datascriptQuery`
+- API reachable and query succeeds
 - auth failure
 - timeout
-- response shape differences
+- `logseq.DB.q` unavailable but `datascriptQuery` available
+- malformed response
+- `doctor` output in `text` and `json`
 
-### File Parsing and Indexing
+CLI routing coverage:
 
-- page property extraction
-- block property extraction
-- task marker extraction
-- `[[ref]]` extraction
-- `#tag` extraction
-- journal page detection
-- nested block ordering
+- `lsq query doctor`
+- `lsq query advanced --query ...`
+- `lsq query advanced --file ...`
+- `--backend auto`
 
-### File Execution
+### Phase 2
 
-- `marker:TODO`
-- `[[project-x]]`
-- `#reading and journal:true`
-- `property:status=active`
-- sort and limit
+Simple parser tests:
+
+- `ref:project-x and marker:TODO`
+- `tag:reading and not marker:DONE`
+- malformed DSL returns actionable errors
+
+File parser tests:
+
+- marker extraction
+- ref extraction
+- tag extraction
+- nested blocks preserve hierarchy
+
+File execution tests:
+
+- ref filter
+- tag filter
+- marker filter
+- logical combinations
 - empty results
-- unsupported operators return clear errors
 
-### End-to-End Fixtures
-
-Use temporary test graphs built in integration tests and reuse the repo's existing integration test infrastructure where possible.
+The repo's existing integration helper under `/Users/tr/Workspace/logseq/logseq-clis/lsq/tests/integration/integration.go` can help with temporary directories and env setup, but it is not by itself a complete integration framework. Phase 1 will need explicit CLI and HTTP test helpers.
 
 ## Risks
 
-1. HTTP API result shapes may vary by Logseq version.
-2. File graphs cannot guarantee parity with DB graphs.
-3. Markdown and Org parsing can become brittle if v1 overreaches.
-4. Future Logseq DB graph evolution may widen the gap between HTTP-native query support and file-native query support.
+1. Logseq HTTP API response shapes may vary by version.
+2. DB query methods may not behave identically across Logseq releases.
+3. The current repo has no CLI subcommand infrastructure yet, so even Phase 1 requires careful refactoring of `main.go`.
+4. A local query engine can easily overreach if it grows beyond the restricted DSL defined here.
 
 ## Delivery Order
 
-Recommended implementation order:
+Recommended order:
 
-1. `query doctor`
-2. HTTP backend and advanced query passthrough
-3. query IR and result contract
-4. simple query parser
-5. file graph parser and index
-6. file backend execution for simple query
-7. advanced subset compilation to IR
-8. auto backend routing and explain mode
+1. add `query doctor`
+2. add HTTP client and advanced-query passthrough
+3. add structured output
+4. add `auto` backend for HTTP-only routing
+5. only then start Phase 2 local DSL work
 
-This sequence delivers real query value early while keeping the local engine bounded and testable.
+This revision intentionally trades breadth for implementability.
