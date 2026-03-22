@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jrswab/lsq/query"
@@ -30,7 +31,7 @@ const (
 // args would be ["doctor", "--format", "json"].
 func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: lsq query doctor [flags]")
+		fmt.Fprintln(stderr, "usage: lsq query <doctor|advanced> [flags]")
 		return 1
 	}
 
@@ -44,6 +45,8 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	format := fs.String("format", "text", "Output format: text, json, ndjson")
 	apiURL := fs.String("api-url", DefaultAPIURL, "Logseq HTTP API endpoint URL")
 	tokenEnv := fs.String("api-token-env", DefaultTokenEnv, "Environment variable name holding the API bearer token")
+	queryStr := fs.String("query", "", "Raw advanced query text (for advanced subcommand)")
+	queryFile := fs.String("file", "", "Path to file containing query text (for advanced subcommand)")
 	_ = fs.Bool("explain", false, "Show verbose diagnostic output (reserved)")
 
 	if err := fs.Parse(flagArgs); err != nil {
@@ -73,8 +76,10 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	switch subcommand {
 	case "doctor":
 		return runDoctor(context.Background(), *format, *apiURL, *tokenEnv, stdout, stderr)
+	case "advanced":
+		return runAdvanced(context.Background(), *format, *apiURL, *tokenEnv, *queryStr, *queryFile, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query doctor [flags]\n", subcommand)
+		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query <doctor|advanced> [flags]\n", subcommand)
 		return 1
 	}
 }
@@ -103,6 +108,59 @@ func runDoctor(ctx context.Context, format, apiURL, tokenEnv string, stdout, std
 
 	// Exit non-zero if the doctor found an error
 	// (API unreachable, auth failed, both methods failed, etc.)
+	if result.Error != nil {
+		return 1
+	}
+	return 0
+}
+
+// runAdvanced executes a raw advanced query through the HTTP API.
+func runAdvanced(ctx context.Context, format, apiURL, tokenEnv, queryStr, queryFile string, stdout, stderr io.Writer) int {
+	// Validate input: exactly one of --query or --file is required.
+	hasQuery := queryStr != ""
+	hasFile := queryFile != ""
+	if !hasQuery && !hasFile {
+		fmt.Fprintln(stderr, "error: one of --query or --file is required")
+		return 1
+	}
+	if hasQuery && hasFile {
+		fmt.Fprintln(stderr, "error: --query and --file are mutually exclusive")
+		return 1
+	}
+
+	// Read query from file if needed.
+	if hasFile {
+		data, err := os.ReadFile(queryFile)
+		if err != nil {
+			fmt.Fprintf(stderr, "error reading query file: %v\n", err)
+			return 1
+		}
+		queryStr = strings.TrimSpace(string(data))
+		if queryStr == "" {
+			fmt.Fprintln(stderr, "error: query file is empty")
+			return 1
+		}
+	}
+
+	token := ""
+	if tokenEnv != "" {
+		token = os.Getenv(tokenEnv)
+	}
+
+	client := httpapi.NewClient(apiURL, token, &http.Client{
+		Timeout: DefaultHTTPTimeout,
+	})
+
+	result := httpapi.RunAdvancedQuery(ctx, client, queryStr)
+
+	out, err := query.RenderResult(format, result)
+	if err != nil {
+		fmt.Fprintf(stderr, "render error: %v\n", err)
+		return 1
+	}
+
+	stdout.Write(out)
+
 	if result.Error != nil {
 		return 1
 	}
