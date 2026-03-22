@@ -152,7 +152,7 @@ func TestRunQuery_NoSubcommand(t *testing.T) {
 		t.Fatalf("expected exit code 1, got %d", code)
 	}
 	errText := stderr.String()
-	if !strings.Contains(errText, "usage: lsq query <doctor|advanced>") {
+	if !strings.Contains(errText, "usage: lsq query <doctor|advanced|simple>") {
 		t.Errorf("expected usage in stderr, got: %s", errText)
 	}
 }
@@ -171,7 +171,7 @@ func TestRunQuery_UnknownSubcommand(t *testing.T) {
 	if !strings.Contains(errText, "unknown query subcommand") {
 		t.Errorf("expected unknown subcommand error, got: %s", errText)
 	}
-	if !strings.Contains(errText, "usage: lsq query <doctor|advanced>") {
+	if !strings.Contains(errText, "usage: lsq query <doctor|advanced|simple>") {
 		t.Errorf("expected usage in error hint, got: %s", errText)
 	}
 }
@@ -448,3 +448,192 @@ func TestRunQuery_DoctorStillWorksAfterAdvanced(t *testing.T) {
 		t.Errorf("command=%v", m["command"])
 	}
 }
+
+// --- Simple query tests ---
+
+func TestRunQuery_SimpleJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+			Args   []any  `json:"args"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+		if req.Method != "logseq.DB.q" {
+			t.Errorf("expected method logseq.DB.q, got %q", req.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[{"block/name":"logseq"}]`)
+	}))
+	defer srv.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "[[logseq]]", "--format", "json", "--api-url", srv.URL + "/api"},
+		&stdout, &stderr,
+	)
+
+	if code != 0 {
+		t.Fatalf("exit code %d; stderr: %s", code, stderr.String())
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &m); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+	if m["backend"] != "http" {
+		t.Errorf("backend=%v", m["backend"])
+	}
+	if m["input_kind"] != "simple" {
+		t.Errorf("input_kind=%v", m["input_kind"])
+	}
+	if m["query_method"] != "logseq.DB.q" {
+		t.Errorf("query_method=%v", m["query_method"])
+	}
+	if m["error"] != nil {
+		t.Errorf("error=%v", m["error"])
+	}
+}
+
+func TestRunQuery_SimpleTaskNowJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[{"block/marker":"NOW"}]`)
+	}))
+	defer srv.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "(task now)", "--format", "json", "--api-url", srv.URL + "/api"},
+		&stdout, &stderr,
+	)
+
+	if code != 0 {
+		t.Fatalf("exit code %d; stderr: %s", code, stderr.String())
+	}
+
+	var m map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &m); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+	if m["input_kind"] != "simple" {
+		t.Errorf("input_kind=%v", m["input_kind"])
+	}
+}
+
+func TestRunQuery_SimpleText(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[{"block/name":"logseq"}]`)
+	}))
+	defer srv.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "[[logseq]]", "--format", "text", "--api-url", srv.URL + "/api"},
+		&stdout, &stderr,
+	)
+
+	if code != 0 {
+		t.Fatalf("exit code %d; stderr: %s", code, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "logseq") {
+		t.Errorf("expected results in text output, got:\n%s", stdout.String())
+	}
+}
+
+func TestRunQuery_SimpleMissingExpr(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--format", "json"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "--expr is required") {
+		t.Errorf("expected missing --expr error, got: %s", stderr.String())
+	}
+}
+
+func TestRunQuery_SimpleWhitespaceOnlyExpr(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "   \t  "},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for whitespace-only --expr, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "--expr is required") {
+		t.Errorf("expected missing --expr error for whitespace expr, got: %s", stderr.String())
+	}
+}
+
+func TestRunQuery_SimpleBackendFileRejected(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "[[logseq]]", "--backend", "file"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "unsupported backend") {
+		t.Errorf("expected backend error, got: %s", stderr.String())
+	}
+}
+
+func TestRunQuery_DoctorStillWorksAfterSimple(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `42`)
+	}))
+	defer srv.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"doctor", "--format", "json", "--api-url", srv.URL + "/api"},
+		&stdout, &stderr,
+	)
+
+	if code != 0 {
+		t.Fatalf("doctor broke after simple addition: exit %d; stderr: %s", code, stderr.String())
+	}
+	var m map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &m); err != nil {
+		t.Fatalf("invalid doctor JSON: %v", err)
+	}
+	if m["command"] != "doctor" {
+		t.Errorf("command=%v", m["command"])
+	}
+}
+
+func TestRunQuery_AdvancedStillWorksAfterSimple(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[["page-a"]]`)
+	}))
+	defer srv.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"advanced", "--query", "[:find ?n :where [?p :block/name ?n]]", "--format", "json", "--api-url", srv.URL + "/api"},
+		&stdout, &stderr,
+	)
+
+	if code != 0 {
+		t.Fatalf("advanced broke after simple addition: exit %d; stderr: %s", code, stderr.String())
+	}
+	var m map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &m); err != nil {
+		t.Fatalf("invalid advanced JSON: %v", err)
+	}
+	if m["input_kind"] != "advanced" {
+		t.Errorf("input_kind=%v", m["input_kind"])
+	}
+}
+

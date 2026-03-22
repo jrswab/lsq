@@ -31,7 +31,7 @@ const (
 // args would be ["doctor", "--format", "json"].
 func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: lsq query <doctor|advanced> [flags]")
+		fmt.Fprintln(stderr, "usage: lsq query <doctor|advanced|simple> [flags]")
 		return 1
 	}
 
@@ -47,6 +47,7 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	tokenEnv := fs.String("api-token-env", DefaultTokenEnv, "Environment variable name holding the API bearer token")
 	queryStr := fs.String("query", "", "Raw advanced query text (for advanced subcommand)")
 	queryFile := fs.String("file", "", "Path to file containing query text (for advanced subcommand)")
+	expr := fs.String("expr", "", "Raw simple DSL expression (for simple subcommand)")
 	_ = fs.Bool("explain", false, "Show verbose diagnostic output (reserved)")
 
 	if err := fs.Parse(flagArgs); err != nil {
@@ -78,8 +79,10 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 		return runDoctor(context.Background(), *format, *apiURL, *tokenEnv, stdout, stderr)
 	case "advanced":
 		return runAdvanced(context.Background(), *format, *apiURL, *tokenEnv, *queryStr, *queryFile, stdout, stderr)
+	case "simple":
+		return runSimple(context.Background(), *format, *apiURL, *tokenEnv, *expr, stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query <doctor|advanced> [flags]\n", subcommand)
+		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query <doctor|advanced|simple> [flags]\n", subcommand)
 		return 1
 	}
 }
@@ -157,6 +160,39 @@ func runAdvanced(ctx context.Context, format, apiURL, tokenEnv, queryStr, queryF
 	})
 
 	result := httpapi.RunAdvancedQuery(ctx, client, queryStr)
+
+	out, err := query.RenderResult(format, result)
+	if err != nil {
+		fmt.Fprintf(stderr, "render error: %v\n", err)
+		return 1
+	}
+
+	stdout.Write(out)
+
+	if result.Error != nil {
+		return 1
+	}
+	return 0
+}
+
+// runSimple executes a raw simple DSL expression through the HTTP API.
+func runSimple(ctx context.Context, format, apiURL, tokenEnv, expr string, stdout, stderr io.Writer) int {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		fmt.Fprintln(stderr, "error: --expr is required for simple queries")
+		return 1
+	}
+
+	token := ""
+	if tokenEnv != "" {
+		token = os.Getenv(tokenEnv)
+	}
+
+	client := httpapi.NewClient(apiURL, token, &http.Client{
+		Timeout: DefaultHTTPTimeout,
+	})
+
+	result := httpapi.RunSimpleQuery(ctx, client, expr)
 
 	out, err := query.RenderResult(format, result)
 	if err != nil {
