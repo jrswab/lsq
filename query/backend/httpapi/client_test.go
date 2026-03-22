@@ -689,6 +689,43 @@ func TestRunAdvancedQuery_FallbackToDatascript(t *testing.T) {
 	}
 }
 
+func TestRunAdvancedQuery_FallbackToDatascript_Null(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		var req apiReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		switch req.Method {
+		case "logseq.DB.q":
+			w.WriteHeader(http.StatusOK)
+			// Return a padded null that evaluates to successful unmarshalling 
+			// by json.RawMessage but lacks substantive result body data
+			fmt.Fprint(w, "  null\n")
+		case "logseq.DB.datascriptQuery":
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `[["result"]]`)
+		}
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?n :where [?p :block/name ?n]]")
+
+	if res.QueryMethod != "logseq.DB.datascriptQuery" {
+		t.Errorf("expected datascriptQuery fallback after DB.q null, got %q", res.QueryMethod)
+	}
+	if res.Error != nil {
+		t.Errorf("expected no error, got %q", *res.Error)
+	}
+	if len(res.Warnings) == 0 {
+		t.Error("expected warning about fallback")
+	}
+	if string(res.Results) != `[["result"]]` {
+		t.Errorf("unexpected results data %s", string(res.Results))
+	}
+}
+
 func TestRunAdvancedQuery_BothFail(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
