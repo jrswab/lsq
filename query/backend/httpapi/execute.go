@@ -130,6 +130,44 @@ func RunAdvancedQuery(ctx context.Context, c *Client, queryStr string) query.Adv
 	return res
 }
 
+// RunSimpleQuery executes a raw simple DSL expression through the HTTP API.
+// It routes expressions directly to logseq.DB.q without fallback.
+//
+// Supported input shapes include:
+//   - [[logseq]]
+//   - (and [[logseq]] #TypeScript)
+//   - (task now)
+//   - (page-property type project)
+//
+// The result reuses AdvancedResult with InputKind="simple" and
+// QueryMethod="logseq.DB.q" so existing rendering works unchanged.
+func RunSimpleQuery(ctx context.Context, c *Client, expr string) query.AdvancedResult {
+	res := query.AdvancedResult{
+		Backend:   "http",
+		InputKind: "simple",
+		Warnings:  []string{},
+	}
+
+	raw, err := c.DoRaw(ctx, "logseq.DB.q", []any{expr})
+	if err == nil {
+		if isJSONNull(raw) {
+			msg := "logseq.DB.q returned null for simple query"
+			res.Error = &msg
+			res.Results = json.RawMessage("null")
+			return res
+		}
+		res.QueryMethod = "logseq.DB.q"
+		res.Results = raw
+		return res
+	}
+
+	// Execution failed.
+	msg := err.Error()
+	res.Error = &msg
+	res.Results = json.RawMessage("null")
+	return res
+}
+
 // --- helpers ---
 
 func isTransport(err error) bool {
@@ -140,6 +178,17 @@ func isTransport(err error) bool {
 func isAuth(err error) bool {
 	var ae *AuthError
 	return errors.As(err, &ae)
+}
+
+func isJSONNull(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return false
+	}
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return false
+	}
+	return v == nil
 }
 
 // classifyAuth updates result auth fields when an auth error is detected.

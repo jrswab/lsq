@@ -683,3 +683,174 @@ func TestRunAdvancedQuery_Failure(t *testing.T) {
 		t.Errorf("expected null results, got %s", res.Results)
 	}
 }
+
+// --- RunSimpleQuery tests ---
+
+func TestRunSimpleQuery_Success(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		var req apiReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if req.Method != "logseq.DB.q" {
+			t.Errorf("expected method logseq.DB.q, got %q", req.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[{"block/name":"logseq"},{"block/name":"typescript"}]`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	res := httpapi.RunSimpleQuery(context.Background(), c, "[[logseq]]")
+
+	if res.Backend != "http" {
+		t.Errorf("expected backend=http, got %q", res.Backend)
+	}
+	if res.InputKind != "simple" {
+		t.Errorf("expected input_kind=simple, got %q", res.InputKind)
+	}
+	if res.QueryMethod != "logseq.DB.q" {
+		t.Errorf("expected query_method=logseq.DB.q, got %q", res.QueryMethod)
+	}
+	if res.Error != nil {
+		t.Errorf("expected no error, got %q", *res.Error)
+	}
+	if !json.Valid(res.Results) {
+		t.Errorf("expected valid JSON results, got %s", res.Results)
+	}
+	if len(res.Warnings) != 0 {
+		t.Errorf("expected no warnings, got %v", res.Warnings)
+	}
+}
+
+func TestRunSimpleQuery_DispatchesToDBQ(t *testing.T) {
+	// Verify simple queries are dispatched exclusively to logseq.DB.q,
+	// never to logseq.DB.datascriptQuery.
+	var gotMethod string
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		var req apiReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		gotMethod = req.Method
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[]`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	_ = httpapi.RunSimpleQuery(context.Background(), c, "(task now)")
+
+	if gotMethod != "logseq.DB.q" {
+		t.Errorf("expected method logseq.DB.q, got %q", gotMethod)
+	}
+}
+
+func TestRunSimpleQuery_Failure(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"error":"broken"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	res := httpapi.RunSimpleQuery(context.Background(), c, "(task now)")
+
+	if res.Error == nil {
+		t.Fatal("expected error on failure")
+	}
+	if string(res.Results) != "null" {
+		t.Errorf("expected null results on failure, got %s", res.Results)
+	}
+	if res.InputKind != "simple" {
+		t.Errorf("expected input_kind=simple on failure, got %q", res.InputKind)
+	}
+}
+
+func TestRunSimpleQuery_AuthFailure(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "bad-token", nil)
+	res := httpapi.RunSimpleQuery(context.Background(), c, "[[logseq]]")
+
+	if res.Error == nil {
+		t.Fatal("expected error on auth failure")
+	}
+	if string(res.Results) != "null" {
+		t.Errorf("expected null results on auth failure, got %s", res.Results)
+	}
+}
+
+func TestRunSimpleQuery_NullResponseIsError(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, ` null `)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	res := httpapi.RunSimpleQuery(context.Background(), c, "{{query [[logseq]]}}")
+
+	if res.Error == nil {
+		t.Fatal("expected error on null response")
+	}
+	if res.QueryMethod != "" {
+		t.Errorf("expected empty query_method on null response, got %q", res.QueryMethod)
+	}
+	if string(res.Results) != "null" {
+		t.Errorf("expected null results on null response, got %s", res.Results)
+	}
+}
+
+func TestRunSimpleQuery_ExpressionShapes(t *testing.T) {
+	// Verify various simple DSL expression shapes are forwarded correctly.
+	tests := []struct {
+		name string
+		expr string
+	}{
+		{"page-ref", "[[logseq]]"},
+		{"task-now", "(task now)"},
+		{"and-combinator", "(and [[logseq]] #TypeScript)"},
+		{"page-property", "(page-property type project)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotArgs []any
+			srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+				var req apiReq
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				gotArgs = req.Args
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprint(w, `[]`)
+			})
+			defer srv.Close()
+
+			c := httpapi.NewClient(apiURL(srv), "", nil)
+			res := httpapi.RunSimpleQuery(context.Background(), c, tt.expr)
+
+			if res.Error != nil {
+				t.Fatalf("unexpected error: %q", *res.Error)
+			}
+			if len(gotArgs) != 1 {
+				t.Fatalf("expected 1 arg, got %d: %v", len(gotArgs), gotArgs)
+			}
+			// JSON decoding turns strings into interface{}, so compare as string.
+			argStr, ok := gotArgs[0].(string)
+			if !ok {
+				t.Fatalf("expected string arg, got %T", gotArgs[0])
+			}
+			if argStr != tt.expr {
+				t.Errorf("expected expr %q, got %q", tt.expr, argStr)
+			}
+		})
+	}
+}
