@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `lsq query doctor` command to check Logseq HTTP API reachability and capabilities.
 - `lsq query advanced` command for executing raw advanced Datalog queries.
 - `lsq query simple` command for executing remote raw simple DSL queries via `logseq.DB.q`.
+- `lsq query simple` intermediate support for stripping Logseq `{{query ...}}` macros for valid simple DSL inputs.
 - Structured output options for query commands: `text`, `json`, and `ndjson`.
 - Support for providing queries via inline `--query` string or `--file` path.
 

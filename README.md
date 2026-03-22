@@ -144,14 +144,14 @@ Test the API connection and capabilities:
 lsq query doctor
 ```
 
-Execute raw simple DSL queries via `logseq.DB.q`:
+Execute simple queries via `logseq.DB.q`:
 ```bash
 lsq query simple --expr '[[logseq]]'
 lsq query simple --expr '(task now)'
-lsq query simple --expr '(and [[logseq]] #TypeScript)'
-lsq query simple --expr '(page-property type project)'
+lsq query simple --expr '{{query (and [[logseq]] #TypeScript)}}'
+lsq query simple --expr '{{query (page-property type project)}}'
 ```
-*Note: This strictly passes native Logseq DSL; it does not parse or strip `{{query ...}}` macros.*
+*Note: `{{query ...}}` wrappers surrounding pure simple DSL are securely stripped before execution. Extended macros (e.g. `{:query ...}`, Datalog, or render configurations) are explicitly unsupported and will fail cleanly.*
 
 Execute raw advanced Datalog queries:
 ```bash
@@ -167,7 +167,6 @@ Available via `--format <format>`:
 
 ### Current Limitations
 - Query support is currently HTTP-only (no local file backend).
-- Simple queries do not perform macro stripping or support advanced EDN payloads.
 - `--backend` currently accepts `auto` or `http`, though both resolve to HTTP.
 - `--explain` is parsed but not yet implemented.
 
