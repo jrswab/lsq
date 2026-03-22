@@ -199,7 +199,7 @@ func TestQueryCLI_AdvancedJSON_Success(t *testing.T) {
 	if m["input_kind"] != "advanced" {
 		t.Errorf("input_kind=%v", m["input_kind"])
 	}
-	if m["query_method"] != "logseq.DB.q" {
+	if m["query_method"] != "logseq.DB.datascriptQuery" {
 		t.Errorf("query_method=%v", m["query_method"])
 	}
 	if m["error"] != nil {

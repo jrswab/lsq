@@ -633,18 +633,27 @@ func TestRunDoctor_Unreachable(t *testing.T) {
 
 // --- RunAdvancedQuery tests ---
 
-func TestRunAdvancedQuery_DBQSuccess(t *testing.T) {
+func TestRunAdvancedQuery_DatascriptQuerySuccess(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `[["page-a"],["page-b"]]`)
+		var req apiReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if req.Method == "logseq.DB.datascriptQuery" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `[["page-a"],["page-b"]]`)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
 	})
 	defer srv.Close()
 
 	c := httpapi.NewClient(apiURL(srv), "", nil)
 	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?n :where [?p :block/name ?n]]")
 
-	if res.QueryMethod != "logseq.DB.q" {
-		t.Errorf("expected query_method=logseq.DB.q, got %q", res.QueryMethod)
+	if res.QueryMethod != "logseq.DB.datascriptQuery" {
+		t.Errorf("expected query_method=logseq.DB.datascriptQuery, got %q", res.QueryMethod)
 	}
 	if res.Error != nil {
 		t.Errorf("expected no error, got %q", *res.Error)
@@ -657,76 +666,7 @@ func TestRunAdvancedQuery_DBQSuccess(t *testing.T) {
 	}
 }
 
-func TestRunAdvancedQuery_FallbackToDatascript(t *testing.T) {
-	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		var req apiReq
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		switch req.Method {
-		case "logseq.DB.q":
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, `{"error":"nope"}`)
-		case "logseq.DB.datascriptQuery":
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, `[["result"]]`)
-		}
-	})
-	defer srv.Close()
-
-	c := httpapi.NewClient(apiURL(srv), "", nil)
-	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?n :where [?p :block/name ?n]]")
-
-	if res.QueryMethod != "logseq.DB.datascriptQuery" {
-		t.Errorf("expected datascriptQuery fallback, got %q", res.QueryMethod)
-	}
-	if res.Error != nil {
-		t.Errorf("expected no error, got %q", *res.Error)
-	}
-	if len(res.Warnings) == 0 {
-		t.Error("expected warning about fallback")
-	}
-}
-
-func TestRunAdvancedQuery_FallbackToDatascript_Null(t *testing.T) {
-	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		var req apiReq
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		switch req.Method {
-		case "logseq.DB.q":
-			w.WriteHeader(http.StatusOK)
-			// Return a padded null that evaluates to successful unmarshalling 
-			// by json.RawMessage but lacks substantive result body data
-			fmt.Fprint(w, "  null\n")
-		case "logseq.DB.datascriptQuery":
-			w.WriteHeader(http.StatusOK)
-			fmt.Fprint(w, `[["result"]]`)
-		}
-	})
-	defer srv.Close()
-
-	c := httpapi.NewClient(apiURL(srv), "", nil)
-	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?n :where [?p :block/name ?n]]")
-
-	if res.QueryMethod != "logseq.DB.datascriptQuery" {
-		t.Errorf("expected datascriptQuery fallback after DB.q null, got %q", res.QueryMethod)
-	}
-	if res.Error != nil {
-		t.Errorf("expected no error, got %q", *res.Error)
-	}
-	if len(res.Warnings) == 0 {
-		t.Error("expected warning about fallback")
-	}
-	if string(res.Results) != `[["result"]]` {
-		t.Errorf("unexpected results data %s", string(res.Results))
-	}
-}
-
-func TestRunAdvancedQuery_BothFail(t *testing.T) {
+func TestRunAdvancedQuery_Failure(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, `{"error":"broken"}`)
@@ -737,7 +677,7 @@ func TestRunAdvancedQuery_BothFail(t *testing.T) {
 	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?e :where [?e :block/uuid]]")
 
 	if res.Error == nil {
-		t.Fatal("expected error when both methods fail")
+		t.Fatal("expected error on failure")
 	}
 	if string(res.Results) != "null" {
 		t.Errorf("expected null results, got %s", res.Results)

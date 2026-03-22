@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/jrswab/lsq/query"
 )
@@ -108,14 +107,8 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 	return res
 }
 
-// isJSONNull checks if the raw JSON message represents a null or empty state.
-func isJSONNull(raw json.RawMessage) bool {
-	s := strings.TrimSpace(string(raw))
-	return s == "" || s == "null"
-}
-
 // RunAdvancedQuery executes a raw advanced query through the HTTP API.
-// It tries logseq.DB.q first and falls back to logseq.DB.datascriptQuery.
+// It routes queries directly to logseq.DB.datascriptQuery.
 func RunAdvancedQuery(ctx context.Context, c *Client, queryStr string) query.AdvancedResult {
 	res := query.AdvancedResult{
 		Backend:   "http",
@@ -123,29 +116,14 @@ func RunAdvancedQuery(ctx context.Context, c *Client, queryStr string) query.Adv
 		Warnings:  []string{},
 	}
 
-	// Try DB.q first.
-	raw, err := c.DoRaw(ctx, "logseq.DB.q", []any{queryStr})
-	if err == nil && !isJSONNull(raw) {
-		res.QueryMethod = "logseq.DB.q"
-		res.Results = raw
-		return res
-	}
-
-	// If it succeeded but returned null, treat it as a failure to force fallback.
+	raw, err := c.DoRaw(ctx, "logseq.DB.datascriptQuery", []any{queryStr})
 	if err == nil {
-		err = fmt.Errorf("logseq.DB.q returned null")
-	}
-
-	// Fallback to datascriptQuery.
-	raw, err2 := c.DoRaw(ctx, "logseq.DB.datascriptQuery", []any{queryStr})
-	if err2 == nil {
 		res.QueryMethod = "logseq.DB.datascriptQuery"
 		res.Results = raw
-		res.Warnings = append(res.Warnings, "logseq.DB.q failed, used datascriptQuery fallback")
 		return res
 	}
 
-	// Both failed.
+	// Execution failed.
 	msg := err.Error()
 	res.Error = &msg
 	res.Results = json.RawMessage("null")
