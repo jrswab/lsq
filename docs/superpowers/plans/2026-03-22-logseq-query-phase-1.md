@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add Phase 1 Logseq query support to `lsq` by validating the Logseq HTTP API, implementing `query doctor`, and executing advanced queries directly through `logseq.DB.datascriptQuery` with structured output.
+**Goal:** Add Phase 1 Logseq query support to `lsq` by validating the Logseq HTTP API, implementing `query doctor`, and executing advanced queries (initially via a transitional fallback, aligned to `logseq.DB.datascriptQuery` cleanly in Task 8) with structured output.
 
 **Architecture:** Phase 1 is HTTP-only. It adds a small query command surface on top of the existing CLI, a focused HTTP API client, and stable result formatting. It does not implement a local query engine or file backend fallback.
 
@@ -112,7 +112,8 @@ func RunAdvancedQuery(ctx context.Context, c *Client, query string) (query.Advan
 Behavior:
 - send `POST /api`
 - add `Authorization: Bearer <token>` only when configured
-- dispatch directly to `logseq.DB.datascriptQuery`
+- try `logseq.DB.q` first (transitional mechanism)
+- fallback to `logseq.DB.datascriptQuery`
 - preserve raw response bytes for later formatting
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -501,6 +502,8 @@ git status --short
 Expected: clean working tree
 
 ## Task 8: Align Advanced Query Routing to Verified API
+
+*(Note: The codebase currently implements a transitional fallback logic aiming at `logseq.DB.q`. This task aligns the codebase tightly with the verified Logseq API boundary by routing advanced query input exclusively up to `datascriptQuery` without guessing.)*
 
 **Files:**
 - Modify: `./query/backend/httpapi/execute.go`

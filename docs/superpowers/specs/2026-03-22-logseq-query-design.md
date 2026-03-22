@@ -185,7 +185,7 @@ The Phase 1 backend contract should be written against the observed request shap
 
 - auth: bearer token when configured
 
-Advanced queries should be routed exclusively to `logseq.DB.datascriptQuery`. `logseq.DB.q` is reserved for simple DSL inputs.
+Advanced queries should be routed exclusively to `logseq.DB.datascriptQuery`, with `logseq.DB.q` reserved for simple DSL inputs.
 
 ### File Backend
 
