@@ -9,6 +9,13 @@ import (
 )
 
 // RunDoctor probes the Logseq HTTP API and returns a structured doctor result.
+//
+// Reachability classification:
+//   - reachable=false only for TransportError (connection refused, DNS, timeout)
+//   - reachable=true for AuthError, MethodError, or any successful response
+//
+// This distinguishes "API unreachable" from "API reachable but query method
+// unavailable/broken".
 func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 	res := query.DoctorResult{
 		Backend:  "http",
@@ -19,37 +26,68 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 
 	res.Auth.Configured = c.Token != ""
 
-	// Probe reachability + DB.q
-	if err := c.ProbeDBQ(ctx); err != nil {
-		var authErr *AuthError
-		if errors.As(err, &authErr) {
-			res.Reachable = true
-			res.Auth.Succeeded = false
-			msg := authErr.Error()
-			res.Error = &msg
-			return res
-		}
-		// Check if datascriptQuery works (maybe the q method is unsupported,
-		// but the connection is fine).
-		if err2 := c.ProbeDatascriptQuery(ctx); err2 != nil {
-			// Both failed — likely unreachable or something else.
-			var authErr2 *AuthError
-			if errors.As(err2, &authErr2) {
+	// Probe DB.q
+	dbqErr := c.ProbeDBQ(ctx)
+	if dbqErr != nil {
+		// Classify: transport → unreachable, auth → reachable but auth failed.
+		if isTransport(dbqErr) {
+			// DB.q hit a transport error. Try datascriptQuery to double-check
+			// (in case it's a flaky connection, both should fail the same way).
+			dsErr := c.ProbeDatascriptQuery(ctx)
+			if dsErr != nil {
+				if isTransport(dsErr) {
+					// Both transport failures → unreachable.
+					msg := dbqErr.Error()
+					res.Error = &msg
+					return res
+				}
+				// DB.q got transport error but datascript didn't — unusual.
+				// The API is reachable (datascript got a real HTTP response).
 				res.Reachable = true
-				res.Auth.Succeeded = false
-				msg := authErr2.Error()
+				classifyAuth(dsErr, &res)
+				if res.Error != nil {
+					return res
+				}
+				// datascriptQuery reached the server but failed at method layer.
+				msg := "both query methods failed"
 				res.Error = &msg
 				return res
 			}
-			msg := err.Error()
+			// datascriptQuery succeeded → API reachable, DB.q is not.
+			res.Reachable = true
+			setAuthSucceeded(&res)
+			res.Capabilities.DatascriptQuery = true
+			res.Warnings = append(res.Warnings, "logseq.DB.q is not available; logseq.DB.datascriptQuery is available as fallback")
+			return res
+		}
+
+		// DB.q returned a non-transport error → API is reachable.
+		res.Reachable = true
+
+		if isAuth(dbqErr) {
+			res.Auth.Succeeded = false
+			msg := dbqErr.Error()
 			res.Error = &msg
 			return res
 		}
-		// datascriptQuery succeeded, so API is reachable but DB.q is not available.
-		res.Reachable = true
-		if res.Auth.Configured {
-			res.Auth.Succeeded = true
+
+		// DB.q failed at method layer. Try datascriptQuery.
+		dsErr := c.ProbeDatascriptQuery(ctx)
+		if dsErr != nil {
+			if isAuth(dsErr) {
+				res.Auth.Succeeded = false
+				msg := dsErr.Error()
+				res.Error = &msg
+				return res
+			}
+			// Both methods failed at method layer → reachable but no capabilities.
+			setAuthSucceeded(&res)
+			msg := "both query methods failed"
+			res.Error = &msg
+			return res
 		}
+		// datascriptQuery succeeded.
+		setAuthSucceeded(&res)
 		res.Capabilities.DatascriptQuery = true
 		res.Warnings = append(res.Warnings, "logseq.DB.q is not available; logseq.DB.datascriptQuery is available as fallback")
 		return res
@@ -57,9 +95,7 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 
 	// DB.q succeeded.
 	res.Reachable = true
-	if res.Auth.Configured {
-		res.Auth.Succeeded = true
-	}
+	setAuthSucceeded(&res)
 	res.Capabilities.DBQ = true
 
 	// Also probe datascriptQuery for completeness.
@@ -101,4 +137,32 @@ func RunAdvancedQuery(ctx context.Context, c *Client, queryStr string) query.Adv
 	res.Error = &msg
 	res.Results = json.RawMessage("null")
 	return res
+}
+
+// --- helpers ---
+
+func isTransport(err error) bool {
+	var te *TransportError
+	return errors.As(err, &te)
+}
+
+func isAuth(err error) bool {
+	var ae *AuthError
+	return errors.As(err, &ae)
+}
+
+// classifyAuth updates result auth fields when an auth error is detected.
+func classifyAuth(err error, res *query.DoctorResult) {
+	if isAuth(err) {
+		res.Auth.Succeeded = false
+		msg := err.Error()
+		res.Error = &msg
+	}
+}
+
+// setAuthSucceeded marks auth.succeeded=true only when a token is configured.
+func setAuthSucceeded(res *query.DoctorResult) {
+	if res.Auth.Configured {
+		res.Auth.Succeeded = true
+	}
 }

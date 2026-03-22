@@ -3,19 +3,26 @@ package httpapi_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/jrswab/lsq/query/backend/httpapi"
 )
 
-// newTestServer returns an httptest.Server whose handler routes on the
-// "method" field of the JSON request body.
+// newTestServer returns an httptest.Server with the given handler.
 func newTestServer(handler http.HandlerFunc) *httptest.Server {
 	return httptest.NewServer(handler)
+}
+
+// apiURL returns the full API endpoint URL for a test server.
+// BaseURL semantics: full endpoint including path, e.g. http://host:port/api.
+func apiURL(srv *httptest.Server) string {
+	return srv.URL + "/api"
 }
 
 // apiReq mirrors the request shape for decoding in test handlers.
@@ -42,13 +49,33 @@ func TestDoRaw_Success(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	raw, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"[:find ?n :where [?p :block/name ?n]]"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !json.Valid(raw) {
 		t.Fatalf("expected valid JSON, got: %s", raw)
+	}
+}
+
+func TestDoRaw_BaseURLIsFullEndpoint(t *testing.T) {
+	// Verify DoRaw posts directly to BaseURL without appending "/api".
+	// We set BaseURL to srv.URL+"/api" and expect the request at /api.
+	// If DoRaw appended "/api" again, the path would be /api/api.
+	var gotPath string
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `"ok"`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	_, _ = c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
+
+	if gotPath != "/api" {
+		t.Errorf("expected request path /api, got %q (double-append bug?)", gotPath)
 	}
 }
 
@@ -61,7 +88,7 @@ func TestDoRaw_BearerAuth(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "test-token-123", nil)
+	c := httpapi.NewClient(apiURL(srv), "test-token-123", nil)
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"[:find ?e . :where [?e :block/uuid]]"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -80,7 +107,7 @@ func TestDoRaw_NoAuthHeaderWhenTokenEmpty(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	_, _ = c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if gotAuth != "" {
 		t.Errorf("expected no Authorization header, got %q", gotAuth)
@@ -93,13 +120,13 @@ func TestDoRaw_AuthFailure401(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "bad-token", nil)
+	c := httpapi.NewClient(apiURL(srv), "bad-token", nil)
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if err == nil {
 		t.Fatal("expected auth error, got nil")
 	}
 	var authErr *httpapi.AuthError
-	if !isAuthError(err, &authErr) {
+	if !errors.As(err, &authErr) {
 		t.Fatalf("expected AuthError, got %T: %v", err, err)
 	}
 	if authErr.StatusCode != 401 {
@@ -113,13 +140,13 @@ func TestDoRaw_AuthFailure403(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "bad-token", nil)
+	c := httpapi.NewClient(apiURL(srv), "bad-token", nil)
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if err == nil {
 		t.Fatal("expected auth error, got nil")
 	}
 	var authErr *httpapi.AuthError
-	if !isAuthError(err, &authErr) {
+	if !errors.As(err, &authErr) {
 		t.Fatalf("expected AuthError, got %T: %v", err, err)
 	}
 	if authErr.StatusCode != 403 {
@@ -134,10 +161,14 @@ func TestDoRaw_MalformedJSON(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if err == nil {
 		t.Fatal("expected error for malformed JSON, got nil")
+	}
+	var me *httpapi.MethodError
+	if !errors.As(err, &me) {
+		t.Fatalf("expected MethodError, got %T: %v", err, err)
 	}
 }
 
@@ -150,11 +181,15 @@ func TestDoRaw_Timeout(t *testing.T) {
 	defer srv.Close()
 
 	httpClient := &http.Client{Timeout: 50 * time.Millisecond}
-	c := httpapi.NewClient(srv.URL, "", httpClient)
+	c := httpapi.NewClient(apiURL(srv), "", httpClient)
 
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if err == nil {
 		t.Fatal("expected timeout error, got nil")
+	}
+	var te *httpapi.TransportError
+	if !errors.As(err, &te) {
+		t.Fatalf("expected TransportError for timeout, got %T: %v", err, err)
 	}
 }
 
@@ -165,18 +200,125 @@ func TestDoRaw_ServerError500(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if err == nil {
 		t.Fatal("expected error for 500, got nil")
 	}
+	var me *httpapi.MethodError
+	if !errors.As(err, &me) {
+		t.Fatalf("expected MethodError for 500, got %T: %v", err, err)
+	}
+	if me.StatusCode != 500 {
+		t.Errorf("expected status 500, got %d", me.StatusCode)
+	}
 }
 
 func TestDoRaw_Unreachable(t *testing.T) {
-	c := httpapi.NewClient("http://127.0.0.1:1", "", &http.Client{Timeout: 500 * time.Millisecond})
+	// Use a port that is extremely unlikely to be listening.
+	c := httpapi.NewClient("http://127.0.0.1:1/api", "", &http.Client{Timeout: 500 * time.Millisecond})
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if err == nil {
 		t.Fatal("expected connection error, got nil")
+	}
+	var te *httpapi.TransportError
+	if !errors.As(err, &te) {
+		t.Fatalf("expected TransportError, got %T: %v", err, err)
+	}
+}
+
+// --- Probe validation tests ---
+
+func TestProbeDBQ_ErrorEnvelope200(t *testing.T) {
+	// Server returns 200 with a JSON error envelope — probe should fail.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":"method not found"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for 200 + error envelope, got nil")
+	}
+	var me *httpapi.MethodError
+	if !errors.As(err, &me) {
+		t.Fatalf("expected MethodError, got %T: %v", err, err)
+	}
+}
+
+func TestProbeDatascriptQuery_ErrorEnvelope200(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":"unsupported method"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDatascriptQuery(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for 200 + error envelope, got nil")
+	}
+}
+
+func TestProbeDBQ_EmptyErrorField200(t *testing.T) {
+	// 200 with {"error":""} should be treated as success (empty error string).
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":""}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err != nil {
+		t.Fatalf("expected success for empty error field, got %v", err)
+	}
+}
+
+func TestProbeDBQ_NullErrorField200(t *testing.T) {
+	// 200 with {"error":null} should be treated as success.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":null,"result":42}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err != nil {
+		t.Fatalf("expected success for null error field, got %v", err)
+	}
+}
+
+func TestProbeDBQ_ArrayResult200(t *testing.T) {
+	// 200 with an array result should succeed (common query response shape).
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `[["page-a"],["page-b"]]`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err != nil {
+		t.Fatalf("expected success for array result, got %v", err)
+	}
+}
+
+func TestProbeDBQ_ScalarResult200(t *testing.T) {
+	// 200 with a scalar result (number) should succeed.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `42`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err != nil {
+		t.Fatalf("expected success for scalar result, got %v", err)
 	}
 }
 
@@ -189,7 +331,7 @@ func TestRunDoctor_AllHealthy(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "tok", nil)
+	c := httpapi.NewClient(apiURL(srv), "tok", nil)
 	res := httpapi.RunDoctor(context.Background(), c)
 
 	if !res.Reachable {
@@ -218,6 +360,25 @@ func TestRunDoctor_AllHealthy(t *testing.T) {
 	}
 }
 
+func TestRunDoctor_APIURLMatchesBaseURL(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `42`)
+	})
+	defer srv.Close()
+
+	fullURL := apiURL(srv)
+	c := httpapi.NewClient(fullURL, "", nil)
+	res := httpapi.RunDoctor(context.Background(), c)
+
+	if res.APIURL != fullURL {
+		t.Errorf("expected api_url=%q, got %q", fullURL, res.APIURL)
+	}
+	if !strings.HasSuffix(res.APIURL, "/api") {
+		t.Errorf("expected api_url to end with /api, got %q", res.APIURL)
+	}
+}
+
 func TestRunDoctor_NoToken(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -225,7 +386,7 @@ func TestRunDoctor_NoToken(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	res := httpapi.RunDoctor(context.Background(), c)
 
 	if !res.Reachable {
@@ -234,7 +395,6 @@ func TestRunDoctor_NoToken(t *testing.T) {
 	if res.Auth.Configured {
 		t.Error("expected auth.configured=false when no token")
 	}
-	// Succeeded should be false when not configured (no assertion on succeeded truth).
 	if res.Auth.Succeeded {
 		t.Error("expected auth.succeeded=false when no token configured")
 	}
@@ -246,7 +406,7 @@ func TestRunDoctor_AuthFailed(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "bad", nil)
+	c := httpapi.NewClient(apiURL(srv), "bad", nil)
 	res := httpapi.RunDoctor(context.Background(), c)
 
 	if !res.Reachable {
@@ -264,14 +424,12 @@ func TestRunDoctor_AuthFailed(t *testing.T) {
 }
 
 func TestRunDoctor_DBQFailedDatascriptWorks(t *testing.T) {
-	callCount := 0
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		var req apiReq
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		callCount++
 		switch req.Method {
 		case "logseq.DB.q":
 			w.WriteHeader(http.StatusInternalServerError)
@@ -285,7 +443,7 @@ func TestRunDoctor_DBQFailedDatascriptWorks(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "tok", nil)
+	c := httpapi.NewClient(apiURL(srv), "tok", nil)
 	res := httpapi.RunDoctor(context.Background(), c)
 
 	if !res.Reachable {
@@ -305,8 +463,64 @@ func TestRunDoctor_DBQFailedDatascriptWorks(t *testing.T) {
 	}
 }
 
+func TestRunDoctor_BothMethodsFail_ReachableTrue(t *testing.T) {
+	// FIX VERIFICATION: Both methods return 500 (method-layer error).
+	// API IS reachable — only capabilities are missing.
+	// The old code reported reachable=false here; the fix reports reachable=true.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, `{"error":"broken"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "tok", nil)
+	res := httpapi.RunDoctor(context.Background(), c)
+
+	if !res.Reachable {
+		t.Error("expected reachable=true when server responds with 500")
+	}
+	if res.Capabilities.DBQ {
+		t.Error("expected capabilities.db_q=false")
+	}
+	if res.Capabilities.DatascriptQuery {
+		t.Error("expected capabilities.datascript_query=false")
+	}
+	if res.Error == nil {
+		t.Error("expected error to be set")
+	}
+	if !res.Auth.Succeeded {
+		t.Error("expected auth.succeeded=true (server responded, no auth error)")
+	}
+}
+
+func TestRunDoctor_BothMethodsReturnErrorEnvelope200(t *testing.T) {
+	// FIX VERIFICATION: Both methods return 200 with error envelopes.
+	// API is reachable, but probe validation catches the error envelopes.
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, `{"error":"method not found"}`)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	res := httpapi.RunDoctor(context.Background(), c)
+
+	if !res.Reachable {
+		t.Error("expected reachable=true when server returns 200")
+	}
+	if res.Capabilities.DBQ {
+		t.Error("expected capabilities.db_q=false for error envelope")
+	}
+	if res.Capabilities.DatascriptQuery {
+		t.Error("expected capabilities.datascript_query=false for error envelope")
+	}
+	if res.Error == nil {
+		t.Error("expected error to be set")
+	}
+}
+
 func TestRunDoctor_Unreachable(t *testing.T) {
-	c := httpapi.NewClient("http://127.0.0.1:1", "", &http.Client{Timeout: 500 * time.Millisecond})
+	c := httpapi.NewClient("http://127.0.0.1:1/api", "", &http.Client{Timeout: 500 * time.Millisecond})
 	res := httpapi.RunDoctor(context.Background(), c)
 
 	if res.Reachable {
@@ -326,7 +540,7 @@ func TestRunAdvancedQuery_DBQSuccess(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?n :where [?p :block/name ?n]]")
 
 	if res.QueryMethod != "logseq.DB.q" {
@@ -361,7 +575,7 @@ func TestRunAdvancedQuery_FallbackToDatascript(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?n :where [?p :block/name ?n]]")
 
 	if res.QueryMethod != "logseq.DB.datascriptQuery" {
@@ -382,7 +596,7 @@ func TestRunAdvancedQuery_BothFail(t *testing.T) {
 	})
 	defer srv.Close()
 
-	c := httpapi.NewClient(srv.URL, "", nil)
+	c := httpapi.NewClient(apiURL(srv), "", nil)
 	res := httpapi.RunAdvancedQuery(context.Background(), c, "[:find ?e :where [?e :block/uuid]]")
 
 	if res.Error == nil {
@@ -391,24 +605,4 @@ func TestRunAdvancedQuery_BothFail(t *testing.T) {
 	if string(res.Results) != "null" {
 		t.Errorf("expected null results, got %s", res.Results)
 	}
-}
-
-// isAuthError is a helper to unwrap AuthError via errors.As.
-func isAuthError(err error, target **httpapi.AuthError) bool {
-	// Use the standard library approach.
-	type asInterface interface {
-		Error() string
-	}
-	for err != nil {
-		if ae, ok := err.(*httpapi.AuthError); ok {
-			*target = ae
-			return true
-		}
-		u, ok := err.(interface{ Unwrap() error })
-		if !ok {
-			return false
-		}
-		err = u.Unwrap()
-	}
-	return false
 }
