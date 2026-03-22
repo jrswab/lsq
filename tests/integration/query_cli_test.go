@@ -356,7 +356,7 @@ func TestQueryCLI_UnsupportedFormat(t *testing.T) {
 }
 
 func TestQueryCLI_UnknownSubcommand(t *testing.T) {
-	res := RunCLI(lsqBinary, []string{"query", "simple"})
+	res := RunCLI(lsqBinary, []string{"query", "magic"})
 
 	if res.ExitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", res.ExitCode)
