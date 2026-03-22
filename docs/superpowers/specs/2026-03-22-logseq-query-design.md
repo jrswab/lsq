@@ -253,6 +253,27 @@ Reports:
 - whether `logseq.DB.q` works
 - whether `logseq.DB.datascriptQuery` works
 
+Illustrative JSON response:
+
+```json
+{
+  "backend": "http",
+  "command": "doctor",
+  "api_url": "http://127.0.0.1:12315/api",
+  "reachable": true,
+  "auth": {
+    "configured": true,
+    "succeeded": true
+  },
+  "capabilities": {
+    "db_q": true,
+    "datascript_query": true
+  },
+  "warnings": [],
+  "error": null
+}
+```
+
 2. `lsq query advanced`
 Accepts either raw query text or a file path and executes it remotely.
 
