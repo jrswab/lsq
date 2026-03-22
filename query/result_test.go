@@ -130,11 +130,13 @@ func TestRenderResult_DoctorJSON_WithError(t *testing.T) {
 }
 
 func TestRenderResult_DoctorJSON_NilWarningsBecomesEmptyArray(t *testing.T) {
-	// Warnings must serialize as [] not null when the slice is non-nil but empty.
+	// When Warnings is nil (zero-value slice, not pre-initialized),
+	// JSON output must still produce "warnings":[] not "warnings":null.
+	// This tests the renderer's normalization guarantee, not the caller's discipline.
 	dr := query.DoctorResult{
-		Backend:  "http",
-		Command:  "doctor",
-		Warnings: []string{},
+		Backend: "http",
+		Command: "doctor",
+		// Warnings deliberately omitted — this is the nil case.
 	}
 
 	out, err := query.RenderResult("json", dr)
@@ -142,9 +144,18 @@ func TestRenderResult_DoctorJSON_NilWarningsBecomesEmptyArray(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Check raw JSON contains "warnings":[] not "warnings":null.
+	// Raw string check: must not contain null.
 	if strings.Contains(string(out), `"warnings":null`) {
-		t.Error("warnings should be [], not null")
+		t.Errorf("nil warnings must serialize as [], got: %s", out)
+	}
+	// Parsed check: must be an empty array.
+	m := mustJSON(t, out)
+	warnings, ok := m["warnings"].([]any)
+	if !ok {
+		t.Fatalf("warnings is not an array: %T %v", m["warnings"], m["warnings"])
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected empty warnings array, got %v", warnings)
 	}
 }
 
@@ -251,6 +262,34 @@ func TestRenderResult_AdvancedJSON_WithFallbackWarning(t *testing.T) {
 	warnings := m["warnings"].([]any)
 	if len(warnings) != 1 {
 		t.Errorf("expected 1 warning, got %d", len(warnings))
+	}
+}
+
+func TestRenderResult_AdvancedJSON_NilWarningsBecomesEmptyArray(t *testing.T) {
+	// Same normalization guarantee as DoctorResult: nil Warnings must
+	// produce "warnings":[] not "warnings":null.
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		QueryMethod: "logseq.DB.q",
+		Results:     json.RawMessage(`[]`),
+		// Warnings deliberately omitted — nil case.
+	}
+
+	out, err := query.RenderResult("json", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(string(out), `"warnings":null`) {
+		t.Errorf("nil warnings must serialize as [], got: %s", out)
+	}
+	m := mustJSON(t, out)
+	warnings, ok := m["warnings"].([]any)
+	if !ok {
+		t.Fatalf("warnings is not an array: %T %v", m["warnings"], m["warnings"])
+	}
+	if len(warnings) != 0 {
+		t.Errorf("expected empty warnings array, got %v", warnings)
 	}
 }
 
@@ -380,6 +419,70 @@ func TestRenderResult_AdvancedNDJSON_ScalarResult(t *testing.T) {
 	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 	if len(lines) != 1 {
 		t.Errorf("expected 1 ndjson line for scalar result, got %d", len(lines))
+	}
+}
+
+func TestRenderResult_DoctorNDJSON_NilWarnings(t *testing.T) {
+	// Nil warnings in a doctor ndjson envelope must serialize as [] not null.
+	dr := query.DoctorResult{
+		Backend: "http",
+		APIURL:  "http://127.0.0.1:12315/api",
+		// Warnings deliberately omitted — nil case.
+	}
+
+	out, err := query.RenderResult("ndjson", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(string(out), `"warnings":null`) {
+		t.Errorf("nil warnings in ndjson envelope must be [], got: %s", out)
+	}
+	m := mustJSON(t, out[:len(out)-1]) // strip trailing newline
+	if _, ok := m["warnings"].([]any); !ok {
+		t.Errorf("warnings should be [] in ndjson envelope, got %T %v", m["warnings"], m["warnings"])
+	}
+}
+
+func TestRenderResult_AdvancedNDJSON_WarningsPreventsExpansion(t *testing.T) {
+	// When AdvancedResult has both results AND warnings, ndjson must emit
+	// the full envelope as one line instead of expanding the results array.
+	// This ensures warning context (e.g. datascriptQuery fallback) is never
+	// silently dropped in the output stream.
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		InputKind:   "advanced",
+		QueryMethod: "logseq.DB.datascriptQuery",
+		Results:     json.RawMessage(`[["page-a"],["page-b"]]`),
+		Warnings:    []string{"logseq.DB.q failed, used datascriptQuery fallback"},
+	}
+
+	out, err := query.RenderResult("ndjson", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 envelope line (not expanded results) when warnings present, got %d lines: %v", len(lines), lines)
+	}
+
+	// The single line must be the full envelope with warnings preserved.
+	m := mustJSON(t, []byte(lines[0]))
+	warnings, ok := m["warnings"].([]any)
+	if !ok || len(warnings) != 1 {
+		t.Errorf("expected 1 warning in ndjson envelope, got %v", m["warnings"])
+	}
+	if warnings[0] != "logseq.DB.q failed, used datascriptQuery fallback" {
+		t.Errorf("unexpected warning text: %v", warnings[0])
+	}
+	// Results must also be present in the envelope.
+	results, ok := m["results"].([]any)
+	if !ok || len(results) != 2 {
+		t.Errorf("expected 2 results in ndjson envelope, got %v", m["results"])
+	}
+	if m["query_method"] != "logseq.DB.datascriptQuery" {
+		t.Errorf("unexpected query_method: %v", m["query_method"])
 	}
 }
 

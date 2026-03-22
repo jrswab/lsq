@@ -100,25 +100,72 @@ func RenderResult(format string, result any) ([]byte, error) {
 
 // renderJSON returns compact JSON with a trailing newline.
 // Go's json.Marshal produces deterministic key order (struct field order).
+//
+// For known result types (DoctorResult, AdvancedResult), nil Warnings slices
+// are normalized to []string{} before marshaling so that "warnings" always
+// serializes as [] rather than null. This guarantee holds regardless of whether
+// the caller pre-initialized the slice.
 func renderJSON(result any) ([]byte, error) {
-	b, err := json.Marshal(result)
+	// Normalize warnings on known types so callers never see "warnings":null.
+	switch v := result.(type) {
+	case DoctorResult:
+		v.Warnings = normalizeWarnings(v.Warnings)
+		return marshalLine(v)
+	case *DoctorResult:
+		if v == nil {
+			return []byte("null\n"), nil
+		}
+		copy := *v
+		copy.Warnings = normalizeWarnings(copy.Warnings)
+		return marshalLine(copy)
+	case AdvancedResult:
+		v.Warnings = normalizeWarnings(v.Warnings)
+		return marshalLine(v)
+	case *AdvancedResult:
+		if v == nil {
+			return []byte("null\n"), nil
+		}
+		copy := *v
+		copy.Warnings = normalizeWarnings(copy.Warnings)
+		return marshalLine(copy)
+	}
+	return marshalLine(result)
+}
+
+// marshalLine encodes v as compact JSON and appends a trailing newline.
+func marshalLine(v any) ([]byte, error) {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, fmt.Errorf("json marshal: %w", err)
 	}
 	return append(b, '\n'), nil
 }
 
+// normalizeWarnings returns an initialized empty slice when w is nil, so that
+// json.Marshal always produces [] instead of null for the warnings field.
+func normalizeWarnings(w []string) []string {
+	if w == nil {
+		return []string{}
+	}
+	return w
+}
+
 // --- NDJSON ---
 
 // renderNDJSON returns newline-delimited JSON.
 //
-// For AdvancedResult: the top-level results array is expanded so each
-// element is emitted as a separate JSON line. This is the primary use
-// case for ndjson in query output — piping individual results to jq or
-// other line-oriented tools.
+// For AdvancedResult with a non-empty, warning-free, array results field:
+// individual result items are emitted as separate JSON lines — the primary
+// use case for piping output to jq or other line-oriented tools.
 //
-// For all other result types: the entire result is emitted as a single
-// newline-terminated JSON line (equivalent to json format).
+// The full envelope is emitted as a single line when:
+//   - there is an error
+//   - results is null or empty
+//   - warnings are present (so context such as the fallback method is preserved)
+//   - results is not a JSON array
+//
+// For DoctorResult and all other types: the entire result is emitted as a
+// single newline-terminated JSON line (equivalent to json format).
 func renderNDJSON(result any) ([]byte, error) {
 	switch v := result.(type) {
 	case AdvancedResult:
@@ -134,9 +181,22 @@ func renderNDJSON(result any) ([]byte, error) {
 }
 
 func advancedNDJSON(r AdvancedResult) ([]byte, error) {
-	// If there is an error or results is null/empty, emit the envelope
-	// as a single line so the error/warning context is not lost.
+	// Conditions that cause the full envelope to be emitted as a single line:
+	//   - r.Error is set: error context must not be lost
+	//   - r.Results is nil/null/empty bytes: nothing to expand
+	//   - r.Warnings is non-empty: warning context (e.g. datascriptQuery fallback)
+	//     must not be silently dropped when only individual result lines are emitted
+	//   - results is not a JSON array: cannot expand into lines
+	//   - results array is empty: no items to emit
+	//
+	// In all other cases the results array is expanded one JSON value per line,
+	// which is the primary machine-readable use case (piping to jq, etc.).
 	if r.Error != nil || len(r.Results) == 0 || string(r.Results) == "null" {
+		return renderJSON(r)
+	}
+	if len(r.Warnings) > 0 {
+		// Warnings carry context (e.g. fallback method used) that belongs with
+		// the result stream. Emit the full envelope so the consumer sees them.
 		return renderJSON(r)
 	}
 
