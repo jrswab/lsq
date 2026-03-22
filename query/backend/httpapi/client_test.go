@@ -1,10 +1,12 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,6 +31,12 @@ func apiURL(srv *httptest.Server) string {
 type apiReq struct {
 	Method string `json:"method"`
 	Args   []any  `json:"args"`
+}
+
+type roundTripperFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return fn(req)
 }
 
 // --- Client.DoRaw tests ---
@@ -59,6 +67,7 @@ func TestDoRaw_Success(t *testing.T) {
 	}
 }
 
+// TestDoRaw_BaseURLIsFullEndpoint verifies the client posts directly to BaseURL.
 func TestDoRaw_BaseURLIsFullEndpoint(t *testing.T) {
 	// Verify DoRaw posts directly to BaseURL without appending "/api".
 	// We set BaseURL to srv.URL+"/api" and expect the request at /api.
@@ -79,6 +88,7 @@ func TestDoRaw_BaseURLIsFullEndpoint(t *testing.T) {
 	}
 }
 
+// TestDoRaw_BearerAuth attaches a bearer token when configured.
 func TestDoRaw_BearerAuth(t *testing.T) {
 	var gotAuth string
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +108,7 @@ func TestDoRaw_BearerAuth(t *testing.T) {
 	}
 }
 
+// TestDoRaw_NoAuthHeaderWhenTokenEmpty omits auth when no token is configured.
 func TestDoRaw_NoAuthHeaderWhenTokenEmpty(t *testing.T) {
 	var gotAuth string
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -114,6 +125,7 @@ func TestDoRaw_NoAuthHeaderWhenTokenEmpty(t *testing.T) {
 	}
 }
 
+// TestDoRaw_AuthFailure401 maps 401 responses to AuthError.
 func TestDoRaw_AuthFailure401(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -134,6 +146,7 @@ func TestDoRaw_AuthFailure401(t *testing.T) {
 	}
 }
 
+// TestDoRaw_AuthFailure403 maps 403 responses to AuthError.
 func TestDoRaw_AuthFailure403(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -154,6 +167,7 @@ func TestDoRaw_AuthFailure403(t *testing.T) {
 	}
 }
 
+// TestDoRaw_MalformedJSON rejects non-JSON response bodies.
 func TestDoRaw_MalformedJSON(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -172,6 +186,7 @@ func TestDoRaw_MalformedJSON(t *testing.T) {
 	}
 }
 
+// TestDoRaw_Timeout wraps request timeouts as transport failures.
 func TestDoRaw_Timeout(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)
@@ -193,6 +208,7 @@ func TestDoRaw_Timeout(t *testing.T) {
 	}
 }
 
+// TestDoRaw_ServerError500 maps non-200 responses to MethodError.
 func TestDoRaw_ServerError500(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -214,6 +230,7 @@ func TestDoRaw_ServerError500(t *testing.T) {
 	}
 }
 
+// TestDoRaw_Unreachable wraps network failures as TransportError.
 func TestDoRaw_Unreachable(t *testing.T) {
 	// Use a port that is extremely unlikely to be listening.
 	c := httpapi.NewClient("http://127.0.0.1:1/api", "", &http.Client{Timeout: 500 * time.Millisecond})
@@ -248,6 +265,35 @@ func TestProbeDBQ_ErrorEnvelope200(t *testing.T) {
 	}
 }
 
+func TestProbeDBQ_WhitespacePrefixedErrorEnvelope200(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, " \n\t {\"error\":\"method not found\"}")
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for whitespace-prefixed error envelope, got nil")
+	}
+}
+
+func TestProbeDBQ_WhitespaceNull200(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, " \n null \t ")
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "", nil)
+	err := c.ProbeDBQ(context.Background())
+	if err == nil {
+		t.Fatal("expected probe failure for null response, got nil")
+	}
+}
+
+// TestProbeDatascriptQuery_ErrorEnvelope200 rejects 200 responses with error envelopes.
 func TestProbeDatascriptQuery_ErrorEnvelope200(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -262,6 +308,7 @@ func TestProbeDatascriptQuery_ErrorEnvelope200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_EmptyErrorField200 treats empty error strings as success.
 func TestProbeDBQ_EmptyErrorField200(t *testing.T) {
 	// 200 with {"error":""} should be treated as success (empty error string).
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -277,6 +324,7 @@ func TestProbeDBQ_EmptyErrorField200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_NullErrorField200 treats null error fields as success.
 func TestProbeDBQ_NullErrorField200(t *testing.T) {
 	// 200 with {"error":null} should be treated as success.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -292,6 +340,7 @@ func TestProbeDBQ_NullErrorField200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_ArrayResult200 accepts array probe results.
 func TestProbeDBQ_ArrayResult200(t *testing.T) {
 	// 200 with an array result should succeed (common query response shape).
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -307,6 +356,7 @@ func TestProbeDBQ_ArrayResult200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_ScalarResult200 accepts scalar probe results.
 func TestProbeDBQ_ScalarResult200(t *testing.T) {
 	// 200 with a scalar result (number) should succeed.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -322,6 +372,7 @@ func TestProbeDBQ_ScalarResult200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_ErrorObjectEnvelope200 rejects structured error envelopes.
 func TestProbeDBQ_ErrorObjectEnvelope200(t *testing.T) {
 	// 200 with {"error": {"message": "..."}} — structured error object.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -337,6 +388,7 @@ func TestProbeDBQ_ErrorObjectEnvelope200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_NumericErrorValue200 rejects numeric error fields.
 func TestProbeDBQ_NumericErrorValue200(t *testing.T) {
 	// 200 with {"error": 500} — numeric error value.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -352,6 +404,7 @@ func TestProbeDBQ_NumericErrorValue200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_OkFalseEnvelope200 rejects ok:false envelopes.
 func TestProbeDBQ_OkFalseEnvelope200(t *testing.T) {
 	// 200 with {"ok": false, "error": "something"} — boolean flag.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -367,6 +420,7 @@ func TestProbeDBQ_OkFalseEnvelope200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_SuccessFalseEnvelope200 rejects success:false envelopes.
 func TestProbeDBQ_SuccessFalseEnvelope200(t *testing.T) {
 	// 200 with {"success": false, "error": "..."} — boolean flag.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -382,6 +436,7 @@ func TestProbeDBQ_SuccessFalseEnvelope200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_OkTrueWithResult200 accepts ok:true envelopes with results.
 func TestProbeDBQ_OkTrueWithResult200(t *testing.T) {
 	// 200 with {"ok": true, "result": [...]} — should succeed.
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -397,6 +452,7 @@ func TestProbeDBQ_OkTrueWithResult200(t *testing.T) {
 	}
 }
 
+// TestProbeDBQ_ResultWithNonBoolOk200 ignores non-boolean ok fields.
 func TestProbeDBQ_ResultWithNonBoolOk200(t *testing.T) {
 	// 200 with {"ok": "yes"} — non-boolean ok is ignored (treated as success).
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
@@ -450,6 +506,7 @@ func TestRunDoctor_AllHealthy(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_APIURLMatchesBaseURL reports the exact configured API URL.
 func TestRunDoctor_APIURLMatchesBaseURL(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -469,6 +526,7 @@ func TestRunDoctor_APIURLMatchesBaseURL(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_NoToken reports unauthenticated-but-reachable doctor results.
 func TestRunDoctor_NoToken(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -490,6 +548,7 @@ func TestRunDoctor_NoToken(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_AuthFailed reports auth failures without marking the API unreachable.
 func TestRunDoctor_AuthFailed(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -513,6 +572,7 @@ func TestRunDoctor_AuthFailed(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_DBQFailedDatascriptWorks reports datascript fallback capability.
 func TestRunDoctor_DBQFailedDatascriptWorks(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		var req apiReq
@@ -553,6 +613,7 @@ func TestRunDoctor_DBQFailedDatascriptWorks(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_BothMethodsFail_ReachableTrue preserves reachable=true on method failures.
 func TestRunDoctor_BothMethodsFail_ReachableTrue(t *testing.T) {
 	// FIX VERIFICATION: Both methods return 500 (method-layer error).
 	// API IS reachable — only capabilities are missing.
@@ -589,6 +650,72 @@ func TestRunDoctor_BothMethodsFail_ReachableTrue(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_MixedTransportAndMethodFailureMarksAuthSucceeded gives auth
+// credit when datascriptQuery reaches the server after DB.q transport failure.
+func TestRunDoctor_MixedTransportAndMethodFailureMarksAuthSucceeded(t *testing.T) {
+	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Method string `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if req.Method == "logseq.DB.datascriptQuery" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `{"error":"unsupported"}`)
+			return
+		}
+		t.Errorf("unexpected method %q", req.Method)
+		http.Error(w, "bad request", http.StatusBadRequest)
+	})
+	defer srv.Close()
+
+	c := httpapi.NewClient(apiURL(srv), "token", nil)
+	c.HTTPClient = &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			if req == nil || req.Body == nil {
+				return nil, fmt.Errorf("missing request")
+			}
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			_ = req.Body.Close()
+
+			var apiReq struct {
+				Method string `json:"method"`
+			}
+			if err := json.Unmarshal(body, &apiReq); err != nil {
+				return nil, err
+			}
+			if apiReq.Method == "logseq.DB.q" {
+				return nil, fmt.Errorf("simulated transport failure")
+			}
+
+			forwardReq, err := http.NewRequestWithContext(req.Context(), req.Method, apiURL(srv), bytes.NewReader(body))
+			if err != nil {
+				return nil, err
+			}
+			forwardReq.Header = req.Header.Clone()
+			return http.DefaultTransport.RoundTrip(forwardReq)
+		}),
+	}
+
+	res := httpapi.RunDoctor(context.Background(), c)
+	if !res.Reachable {
+		t.Fatal("expected reachable=true")
+	}
+	if !res.Auth.Succeeded {
+		t.Fatal("expected auth.succeeded=true")
+	}
+	if res.Error == nil {
+		t.Fatal("expected method-layer error")
+	}
+}
+
+// TestRunDoctor_BothMethodsReturnErrorEnvelope200 rejects method-layer error envelopes.
 func TestRunDoctor_BothMethodsReturnErrorEnvelope200(t *testing.T) {
 	// FIX VERIFICATION: Both methods return 200 with error envelopes.
 	// API is reachable, but probe validation catches the error envelopes.
@@ -619,6 +746,7 @@ func TestRunDoctor_BothMethodsReturnErrorEnvelope200(t *testing.T) {
 	}
 }
 
+// TestRunDoctor_Unreachable reports transport failures as unreachable.
 func TestRunDoctor_Unreachable(t *testing.T) {
 	c := httpapi.NewClient("http://127.0.0.1:1/api", "", &http.Client{Timeout: 500 * time.Millisecond})
 	res := httpapi.RunDoctor(context.Background(), c)
@@ -666,6 +794,7 @@ func TestRunAdvancedQuery_DatascriptQuerySuccess(t *testing.T) {
 	}
 }
 
+// TestRunAdvancedQuery_Failure returns an error envelope for datascript failures.
 func TestRunAdvancedQuery_Failure(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -724,6 +853,7 @@ func TestRunSimpleQuery_Success(t *testing.T) {
 	}
 }
 
+// TestRunSimpleQuery_DispatchesToDBQ verifies simple queries call DB.q.
 func TestRunSimpleQuery_DispatchesToDBQ(t *testing.T) {
 	// Verify simple queries are dispatched exclusively to logseq.DB.q,
 	// never to logseq.DB.datascriptQuery.
@@ -748,6 +878,7 @@ func TestRunSimpleQuery_DispatchesToDBQ(t *testing.T) {
 	}
 }
 
+// TestRunSimpleQuery_Failure returns an error envelope for DB.q failures.
 func TestRunSimpleQuery_Failure(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -769,6 +900,7 @@ func TestRunSimpleQuery_Failure(t *testing.T) {
 	}
 }
 
+// TestRunSimpleQuery_AuthFailure preserves auth failures from the HTTP API.
 func TestRunSimpleQuery_AuthFailure(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -786,6 +918,7 @@ func TestRunSimpleQuery_AuthFailure(t *testing.T) {
 	}
 }
 
+// TestRunSimpleQuery_NullResponseIsError rejects 200+null DB.q responses.
 func TestRunSimpleQuery_NullResponseIsError(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -810,6 +943,7 @@ func TestRunSimpleQuery_NullResponseIsError(t *testing.T) {
 	}
 }
 
+// TestRunSimpleQuery_ErrorEnvelopeIsError rejects string error envelopes.
 func TestRunSimpleQuery_ErrorEnvelopeIsError(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -832,6 +966,7 @@ func TestRunSimpleQuery_ErrorEnvelopeIsError(t *testing.T) {
 	}
 }
 
+// TestRunSimpleQuery_ErrorObjectEnvelopeIsError rejects structured error envelopes.
 func TestRunSimpleQuery_ErrorObjectEnvelopeIsError(t *testing.T) {
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -853,7 +988,7 @@ func TestRunSimpleQuery_ErrorObjectEnvelopeIsError(t *testing.T) {
 	}
 }
 
-
+// TestRunSimpleQuery_ExpressionShapes verifies accepted raw simple DSL forms.
 func TestRunSimpleQuery_ExpressionShapes(t *testing.T) {
 	// Verify various simple DSL expression shapes are forwarded correctly.
 	tests := []struct {

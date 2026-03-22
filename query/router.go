@@ -12,7 +12,7 @@ type HTTPSimpleExecutor func(ctx context.Context, expr string) AdvancedResult
 
 // RunSimple evaluates the backend policy and routes raw simple queries to the execution engine.
 //
-// Phase 2 routing mechanics:
+// HTTP-only routing mechanics:
 //   - "auto" resolves to the HTTP executor
 //   - "http" routes to the HTTP executor
 //   - "file" or any other value yields an error

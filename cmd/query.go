@@ -29,8 +29,8 @@ var allowedSimpleMacroInnerPatterns = []*regexp.Regexp{
 
 // Default values for query flags.
 const (
-	DefaultAPIURL     = "http://127.0.0.1:12315/api"
-	DefaultTokenEnv   = "LOGSEQ_API_TOKEN"
+	DefaultAPIURL      = "http://127.0.0.1:12315/api"
+	DefaultTokenEnv    = "LOGSEQ_API_TOKEN"
 	DefaultHTTPTimeout = 10 * time.Second
 )
 
@@ -50,6 +50,14 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	subcommand := args[0]
 	flagArgs := args[1:]
 
+	switch subcommand {
+	case "doctor", "advanced", "simple":
+		// supported
+	default:
+		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query <doctor|advanced|simple> [flags]\n", subcommand)
+		return 1
+	}
+
 	fs := flag.NewFlagSet("lsq query "+subcommand, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 
@@ -64,6 +72,14 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if err := fs.Parse(flagArgs); err != nil {
 		// flag.ContinueOnError: Parse already printed the error to stderr.
+		return 1
+	}
+	if extras := fs.Args(); len(extras) > 0 {
+		fmt.Fprintf(stderr, "unexpected argument(s): %s\n", strings.Join(extras, " "))
+		return 1
+	}
+	if err := validateSubcommandFlags(subcommand, fs); err != nil {
+		fmt.Fprintf(stderr, "error: %v\n", err)
 		return 1
 	}
 
@@ -84,10 +100,38 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 		return runAdvanced(context.Background(), *format, *backend, *apiURL, *tokenEnv, *queryStr, *queryFile, stdout, stderr)
 	case "simple":
 		return runSimple(context.Background(), *format, *backend, *apiURL, *tokenEnv, *expr, stdout, stderr)
-	default:
-		fmt.Fprintf(stderr, "unknown query subcommand: %q\nusage: lsq query <doctor|advanced|simple> [flags]\n", subcommand)
-		return 1
 	}
+	return 1
+}
+
+func validateSubcommandFlags(subcommand string, fs *flag.FlagSet) error {
+	allowed := map[string]map[string]struct{}{
+		"doctor": {
+			"backend": {}, "format": {}, "api-url": {}, "api-token-env": {}, "explain": {},
+		},
+		"advanced": {
+			"backend": {}, "format": {}, "api-url": {}, "api-token-env": {}, "query": {}, "file": {}, "explain": {},
+		},
+		"simple": {
+			"backend": {}, "format": {}, "api-url": {}, "api-token-env": {}, "expr": {}, "explain": {},
+		},
+	}
+
+	subAllowed, ok := allowed[subcommand]
+	if !ok {
+		return fmt.Errorf("unknown query subcommand %q", subcommand)
+	}
+
+	var invalid []string
+	fs.Visit(func(f *flag.Flag) {
+		if _, ok := subAllowed[f.Name]; !ok {
+			invalid = append(invalid, "--"+f.Name)
+		}
+	})
+	if len(invalid) > 0 {
+		return fmt.Errorf("flag(s) %s are not valid for %s", strings.Join(invalid, ", "), subcommand)
+	}
+	return nil
 }
 
 // runDoctor probes the Logseq HTTP API and prints the doctor result.

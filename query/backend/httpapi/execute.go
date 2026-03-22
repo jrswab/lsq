@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -49,6 +50,7 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 				if res.Error != nil {
 					return res
 				}
+				setAuthSucceeded(&res)
 				// datascriptQuery reached the server but failed at method layer.
 				msg := bothFailedMsg(dbqErr, dsErr)
 				res.Error = &msg
@@ -187,14 +189,7 @@ func isAuth(err error) bool {
 }
 
 func isJSONNull(raw json.RawMessage) bool {
-	if len(raw) == 0 {
-		return false
-	}
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
-		return false
-	}
-	return v == nil
+	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }
 
 // classifyAuth updates result auth fields when an auth error is detected.

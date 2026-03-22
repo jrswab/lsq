@@ -9,17 +9,22 @@ import (
 	"testing"
 )
 
+// TestQuerySimpleCLI_JSON_Success verifies remote simple query success via the built binary.
 func TestQuerySimpleCLI_JSON_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Method string `json:"method"`
 			Args   []any  `json:"args"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
 		if req.Method != "logseq.DB.q" {
 			t.Errorf("expected method logseq.DB.q, got %q", req.Method)
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `[{"block/name":"logseq"}]`)
 	}))
@@ -65,6 +70,7 @@ func TestQuerySimpleCLI_JSON_Success(t *testing.T) {
 	}
 }
 
+// TestQuerySimpleCLI_JSON_TaskNow verifies task-now simple queries via the built binary.
 func TestQuerySimpleCLI_JSON_TaskNow(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -96,6 +102,7 @@ func TestQuerySimpleCLI_JSON_TaskNow(t *testing.T) {
 	}
 }
 
+// TestQuerySimpleCLI_NullResponse_IsError rejects 200+null simple query responses.
 func TestQuerySimpleCLI_NullResponse_IsError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -131,6 +138,7 @@ func TestQuerySimpleCLI_NullResponse_IsError(t *testing.T) {
 	}
 }
 
+// TestQuerySimpleCLI_ErrorEnvelope_IsError rejects explicit error envelopes from DB.q.
 func TestQuerySimpleCLI_ErrorEnvelope_IsError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -1,6 +1,7 @@
 package query
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -84,6 +85,10 @@ type AdvancedResult struct {
 // AdvancedResult) or a pointer to one. Returns an error for unsupported
 // format names or unrecognized result types.
 func RenderResult(format string, result any) ([]byte, error) {
+	if err := validateResultType(result); err != nil {
+		return nil, err
+	}
+
 	switch format {
 	case FormatJSON:
 		return renderJSON(result)
@@ -93,6 +98,15 @@ func RenderResult(format string, result any) ([]byte, error) {
 		return renderText(result)
 	default:
 		return nil, fmt.Errorf("unsupported format %q: must be one of json, ndjson, text", format)
+	}
+}
+
+func validateResultType(result any) error {
+	switch result.(type) {
+	case DoctorResult, *DoctorResult, AdvancedResult, *AdvancedResult:
+		return nil
+	default:
+		return fmt.Errorf("unsupported result type %T", result)
 	}
 }
 
@@ -191,7 +205,7 @@ func advancedNDJSON(r AdvancedResult) ([]byte, error) {
 	//
 	// In all other cases the results array is expanded one JSON value per line,
 	// which is the primary machine-readable use case (piping to jq, etc.).
-	if r.Error != nil || len(r.Results) == 0 || string(r.Results) == "null" {
+	if r.Error != nil || len(r.Results) == 0 || isJSONNullMessage(r.Results) {
 		return renderJSON(r)
 	}
 	if len(r.Warnings) > 0 {
@@ -215,11 +229,11 @@ func advancedNDJSON(r AdvancedResult) ([]byte, error) {
 
 	var buf []byte
 	for _, item := range items {
-		compact, err := json.Marshal(item)
-		if err != nil {
-			return nil, fmt.Errorf("ndjson item marshal: %w", err)
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, item); err != nil {
+			return nil, fmt.Errorf("ndjson item compact: %w", err)
 		}
-		buf = append(buf, compact...)
+		buf = append(buf, compact.Bytes()...)
 		buf = append(buf, '\n')
 	}
 	return buf, nil
@@ -285,7 +299,7 @@ func advancedText(r AdvancedResult) []byte {
 	}
 
 	// For text output, pretty-print the results JSON.
-	if len(r.Results) > 0 && string(r.Results) != "null" {
+	if len(r.Results) > 0 && !isJSONNullMessage(r.Results) {
 		var pretty json.RawMessage
 		if json.Unmarshal(r.Results, &pretty) == nil {
 			indented, err := json.MarshalIndent(pretty, "", "  ")
@@ -304,4 +318,8 @@ func advancedText(r AdvancedResult) []byte {
 	}
 
 	return []byte(sb.String())
+}
+
+func isJSONNullMessage(raw json.RawMessage) bool {
+	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }

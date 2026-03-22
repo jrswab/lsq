@@ -148,7 +148,11 @@ func (c *Client) ProbeDatascriptQuery(ctx context.Context) error {
 // TODO(real-api): After testing against a real Logseq instance, refine
 // this function based on observed success/error response shapes.
 func isProbeSuccess(raw json.RawMessage) bool {
+	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 {
+		return false
+	}
+	if bytes.Equal(raw, []byte("null")) {
 		return false
 	}
 	// Non-object responses (arrays, scalars) are valid query results.
@@ -211,10 +215,12 @@ type TransportError struct {
 	Cause error
 }
 
+// Error formats the transport failure for display.
 func (e *TransportError) Error() string {
 	return fmt.Sprintf("transport error: %v", e.Cause)
 }
 
+// Unwrap returns the underlying network error.
 func (e *TransportError) Unwrap() error {
 	return e.Cause
 }
@@ -224,6 +230,7 @@ type AuthError struct {
 	StatusCode int
 }
 
+// Error formats the authentication failure for display.
 func (e *AuthError) Error() string {
 	return fmt.Sprintf("auth failed with status %d", e.StatusCode)
 }
@@ -235,6 +242,7 @@ type MethodError struct {
 	Body       string
 }
 
+// Error formats the method-layer failure for display.
 func (e *MethodError) Error() string {
 	return fmt.Sprintf("method error (status %d): %s", e.StatusCode, e.Body)
 }

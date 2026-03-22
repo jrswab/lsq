@@ -16,7 +16,9 @@ func TestLegacyCLI_DefaultJournalPath(t *testing.T) {
 
 	// Write a minimal config so lsq knows where the graph is.
 	configContent := []byte(`{:graph "` + helper.LogseqDir + `"}`)
-	os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644)
+	if err := os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644); err != nil {
+		t.Fatalf("write config.edn: %v", err)
+	}
 
 	// Invoke lsq with no arguments. It should try to open today's journal.
 	// Because EDITOR=echo, the output will just be the filepath.
@@ -32,16 +34,21 @@ func TestLegacyCLI_DefaultJournalPath(t *testing.T) {
 	}
 }
 
+// TestLegacyCLI_PrintContent verifies legacy print behavior through the built binary.
 func TestLegacyCLI_PrintContent(t *testing.T) {
 	helper := NewTestHelper(t)
 	defer helper.Cleanup()
 
 	// Setup config and a dummy page.
 	configContent := []byte(`{:graph "` + helper.LogseqDir + `"}`)
-	os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644)
+	if err := os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644); err != nil {
+		t.Fatalf("write config.edn: %v", err)
+	}
 
 	pagePath := filepath.Join(helper.PagesDir, "Test Page.md")
-	os.WriteFile(pagePath, []byte("- smoke test content\n"), 0644)
+	if err := os.WriteFile(pagePath, []byte("- smoke test content\n"), 0644); err != nil {
+		t.Fatalf("write Test Page.md: %v", err)
+	}
 
 	// Invoke lsq -p <page> -c to cat the file.
 	res := RunCLI(lsqBinary, []string{"-p", "Test Page.md", "-c"})
@@ -55,16 +62,21 @@ func TestLegacyCLI_PrintContent(t *testing.T) {
 	}
 }
 
+// TestLegacyCLI_FindFile verifies legacy filename search through the built binary.
 func TestLegacyCLI_FindFile(t *testing.T) {
 	helper := NewTestHelper(t)
 	defer helper.Cleanup()
 
 	// Setup config and a dummy page.
 	configContent := []byte(`{:graph "` + helper.LogseqDir + `"}`)
-	os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644)
+	if err := os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644); err != nil {
+		t.Fatalf("write config.edn: %v", err)
+	}
 
 	pagePath := filepath.Join(helper.PagesDir, "Another Page.md")
-	os.WriteFile(pagePath, []byte("- empty\n"), 0644)
+	if err := os.WriteFile(pagePath, []byte("- empty\n"), 0644); err != nil {
+		t.Fatalf("write Another Page.md: %v", err)
+	}
 
 	// Invoke lsq -f to find the file path.
 	res := RunCLI(lsqBinary, []string{"-f", "Another Page"})
@@ -79,17 +91,22 @@ func TestLegacyCLI_FindFile(t *testing.T) {
 	}
 }
 
+// TestLegacyCLI_FindAlias verifies legacy alias search through the built binary.
 func TestLegacyCLI_FindAlias(t *testing.T) {
 	helper := NewTestHelper(t)
 	defer helper.Cleanup()
 
 	// Setup config and a dummy page with an alias property.
 	configContent := []byte(`{:graph "` + helper.LogseqDir + `"}`)
-	os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644)
+	if err := os.WriteFile(filepath.Join(helper.ConfigDir, "config.edn"), configContent, 0644); err != nil {
+		t.Fatalf("write config.edn: %v", err)
+	}
 
 	pagePath := filepath.Join(helper.PagesDir, "Original Target.md")
 	// The lsq trie parses properties, including alias::.
-	os.WriteFile(pagePath, []byte("alias:: Secret Keyword\n\n- some content\n"), 0644)
+	if err := os.WriteFile(pagePath, []byte("alias:: Secret Keyword\n\n- some content\n"), 0644); err != nil {
+		t.Fatalf("write Original Target.md: %v", err)
+	}
 
 	// Invoke lsq -f to search by the alias.
 	res := RunCLI(lsqBinary, []string{"-f", "Secret Keyword"})

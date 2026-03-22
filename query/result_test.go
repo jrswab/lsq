@@ -25,9 +25,9 @@ func mustJSON(t *testing.T, data []byte) map[string]any {
 
 func TestRenderResult_DoctorJSON_AllHealthy(t *testing.T) {
 	dr := query.DoctorResult{
-		Backend:  "http",
-		Command:  "doctor",
-		APIURL:   "http://127.0.0.1:12315/api",
+		Backend:   "http",
+		Command:   "doctor",
+		APIURL:    "http://127.0.0.1:12315/api",
 		Reachable: true,
 		Auth: query.DoctorAuth{
 			Configured: true,
@@ -104,6 +104,7 @@ func TestRenderResult_DoctorJSON_AllHealthy(t *testing.T) {
 	}
 }
 
+// TestRenderResult_DoctorJSON_WithError preserves doctor errors in JSON output.
 func TestRenderResult_DoctorJSON_WithError(t *testing.T) {
 	dr := query.DoctorResult{
 		Backend:  "http",
@@ -129,6 +130,7 @@ func TestRenderResult_DoctorJSON_WithError(t *testing.T) {
 	}
 }
 
+// TestRenderResult_DoctorJSON_NilWarningsBecomesEmptyArray normalizes nil warnings.
 func TestRenderResult_DoctorJSON_NilWarningsBecomesEmptyArray(t *testing.T) {
 	// When Warnings is nil (zero-value slice, not pre-initialized),
 	// JSON output must still produce "warnings":[] not "warnings":null.
@@ -199,6 +201,7 @@ func TestRenderResult_AdvancedJSON_Success(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedJSON_EmptyResults keeps empty result arrays intact.
 func TestRenderResult_AdvancedJSON_EmptyResults(t *testing.T) {
 	ar := query.AdvancedResult{
 		Backend:     "http",
@@ -220,6 +223,7 @@ func TestRenderResult_AdvancedJSON_EmptyResults(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedJSON_NullResults preserves null results in JSON output.
 func TestRenderResult_AdvancedJSON_NullResults(t *testing.T) {
 	ar := query.AdvancedResult{
 		Backend:     "http",
@@ -244,6 +248,7 @@ func TestRenderResult_AdvancedJSON_NullResults(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedJSON_WithFallbackWarning preserves warning context.
 func TestRenderResult_AdvancedJSON_WithFallbackWarning(t *testing.T) {
 	ar := query.AdvancedResult{
 		Backend:     "http",
@@ -265,6 +270,7 @@ func TestRenderResult_AdvancedJSON_WithFallbackWarning(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedJSON_NilWarningsBecomesEmptyArray normalizes nil warnings.
 func TestRenderResult_AdvancedJSON_NilWarningsBecomesEmptyArray(t *testing.T) {
 	// Same normalization guarantee as DoctorResult: nil Warnings must
 	// produce "warnings":[] not "warnings":null.
@@ -298,11 +304,11 @@ func TestRenderResult_AdvancedJSON_NilWarningsBecomesEmptyArray(t *testing.T) {
 func TestRenderResult_DoctorNDJSON(t *testing.T) {
 	// Doctor result in ndjson is a single line (same as json).
 	dr := query.DoctorResult{
-		Backend:  "http",
-		Command:  "doctor",
-		APIURL:   "http://127.0.0.1:12315/api",
+		Backend:   "http",
+		Command:   "doctor",
+		APIURL:    "http://127.0.0.1:12315/api",
 		Reachable: true,
-		Warnings: []string{},
+		Warnings:  []string{},
 	}
 
 	out, err := query.RenderResult("ndjson", dr)
@@ -321,6 +327,7 @@ func TestRenderResult_DoctorNDJSON(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedNDJSON_ExpandsResults emits one NDJSON line per result row.
 func TestRenderResult_AdvancedNDJSON_ExpandsResults(t *testing.T) {
 	ar := query.AdvancedResult{
 		Backend:     "http",
@@ -355,6 +362,39 @@ func TestRenderResult_AdvancedNDJSON_ExpandsResults(t *testing.T) {
 	}
 }
 
+func TestRenderResult_AdvancedNDJSON_CompactsPrettyPrintedItems(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:   "http",
+		InputKind: "advanced",
+		Results: json.RawMessage(`[
+  {
+    "key": "val"
+  },
+  [
+    "nested"
+  ]
+]`),
+		Warnings: []string{},
+	}
+
+	out, err := query.RenderResult("ndjson", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 ndjson lines, got %d: %v", len(lines), lines)
+	}
+	if lines[0] != `{"key":"val"}` {
+		t.Fatalf("expected compact object line, got %q", lines[0])
+	}
+	if lines[1] != `["nested"]` {
+		t.Fatalf("expected compact array line, got %q", lines[1])
+	}
+}
+
+// TestRenderResult_AdvancedNDJSON_ErrorFallsBackToEnvelope keeps error context visible.
 func TestRenderResult_AdvancedNDJSON_ErrorFallsBackToEnvelope(t *testing.T) {
 	// When there is an error, ndjson emits the full envelope as one line
 	// so error/warning context is not lost.
@@ -381,6 +421,7 @@ func TestRenderResult_AdvancedNDJSON_ErrorFallsBackToEnvelope(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedNDJSON_EmptyResults emits the full envelope for empty arrays.
 func TestRenderResult_AdvancedNDJSON_EmptyResults(t *testing.T) {
 	ar := query.AdvancedResult{
 		Backend:     "http",
@@ -402,6 +443,7 @@ func TestRenderResult_AdvancedNDJSON_EmptyResults(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedNDJSON_ScalarResult emits the full envelope for scalar results.
 func TestRenderResult_AdvancedNDJSON_ScalarResult(t *testing.T) {
 	// If results is a scalar (not an array), emit the full envelope.
 	ar := query.AdvancedResult{
@@ -422,6 +464,7 @@ func TestRenderResult_AdvancedNDJSON_ScalarResult(t *testing.T) {
 	}
 }
 
+// TestRenderResult_DoctorNDJSON_NilWarnings normalizes nil warnings in NDJSON output.
 func TestRenderResult_DoctorNDJSON_NilWarnings(t *testing.T) {
 	// Nil warnings in a doctor ndjson envelope must serialize as [] not null.
 	dr := query.DoctorResult{
@@ -444,6 +487,7 @@ func TestRenderResult_DoctorNDJSON_NilWarnings(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedNDJSON_WarningsPreventsExpansion preserves warning context.
 func TestRenderResult_AdvancedNDJSON_WarningsPreventsExpansion(t *testing.T) {
 	// When AdvancedResult has both results AND warnings, ndjson must emit
 	// the full envelope as one line instead of expanding the results array.
@@ -490,9 +534,9 @@ func TestRenderResult_AdvancedNDJSON_WarningsPreventsExpansion(t *testing.T) {
 
 func TestRenderResult_DoctorText_AllHealthy(t *testing.T) {
 	dr := query.DoctorResult{
-		Backend:  "http",
-		Command:  "doctor",
-		APIURL:   "http://127.0.0.1:12315/api",
+		Backend:   "http",
+		Command:   "doctor",
+		APIURL:    "http://127.0.0.1:12315/api",
 		Reachable: true,
 		Auth: query.DoctorAuth{
 			Configured: true,
@@ -533,6 +577,7 @@ func TestRenderResult_DoctorText_AllHealthy(t *testing.T) {
 	}
 }
 
+// TestRenderResult_DoctorText_Unreachable reports transport failures in text output.
 func TestRenderResult_DoctorText_Unreachable(t *testing.T) {
 	dr := query.DoctorResult{
 		Backend:  "http",
@@ -558,12 +603,13 @@ func TestRenderResult_DoctorText_Unreachable(t *testing.T) {
 	}
 }
 
+// TestRenderResult_DoctorText_WithWarnings renders warning lines in text output.
 func TestRenderResult_DoctorText_WithWarnings(t *testing.T) {
 	dr := query.DoctorResult{
-		Backend:  "http",
-		APIURL:   "http://127.0.0.1:12315/api",
+		Backend:   "http",
+		APIURL:    "http://127.0.0.1:12315/api",
 		Reachable: true,
-		Warnings: []string{"warn1", "warn2"},
+		Warnings:  []string{"warn1", "warn2"},
 	}
 
 	out, err := query.RenderResult("text", dr)
@@ -577,6 +623,7 @@ func TestRenderResult_DoctorText_WithWarnings(t *testing.T) {
 	}
 }
 
+// TestRenderResult_AdvancedText_Success pretty-prints successful advanced results.
 func TestRenderResult_AdvancedText_Success(t *testing.T) {
 	ar := query.AdvancedResult{
 		Backend:     "http",
@@ -601,6 +648,27 @@ func TestRenderResult_AdvancedText_Success(t *testing.T) {
 	}
 }
 
+func TestRenderResult_AdvancedText_WhitespaceNullResults(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:  "http",
+		Results:  json.RawMessage(" \n null \t "),
+		Warnings: []string{"kept"},
+	}
+
+	out, err := query.RenderResult("text", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if strings.Contains(string(out), "null") {
+		t.Fatalf("did not expect null payload to be rendered, got %q", string(out))
+	}
+	if !strings.Contains(string(out), "Warnings: kept") {
+		t.Fatalf("expected warnings to remain visible, got %q", string(out))
+	}
+}
+
+// TestRenderResult_AdvancedText_Error reports advanced execution failures.
 func TestRenderResult_AdvancedText_Error(t *testing.T) {
 	ar := query.AdvancedResult{
 		Backend:  "http",
@@ -636,6 +704,20 @@ func TestRenderResult_UnsupportedFormat(t *testing.T) {
 	}
 }
 
+// TestRenderResult_UnsupportedTypeJSON rejects unsupported result types for JSON output.
+func TestRenderResult_UnsupportedTypeJSON(t *testing.T) {
+	if _, err := query.RenderResult("json", struct{ Name string }{"bad"}); err == nil {
+		t.Fatal("expected unsupported result type error")
+	}
+}
+
+// TestRenderResult_UnsupportedTypeNDJSON rejects unsupported result types for NDJSON output.
+func TestRenderResult_UnsupportedTypeNDJSON(t *testing.T) {
+	if _, err := query.RenderResult("ndjson", []string{"bad"}); err == nil {
+		t.Fatal("expected unsupported result type error")
+	}
+}
+
 // --- Pointer receivers ---
 
 func TestRenderResult_PointerDoctorResult(t *testing.T) {
@@ -652,6 +734,7 @@ func TestRenderResult_PointerDoctorResult(t *testing.T) {
 	}
 }
 
+// TestRenderResult_PointerAdvancedResult accepts pointer inputs for advanced results.
 func TestRenderResult_PointerAdvancedResult(t *testing.T) {
 	ar := &query.AdvancedResult{
 		Backend:  "http",

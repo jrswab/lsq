@@ -102,7 +102,17 @@ func (h *TestHelper) AssertFileExists(path string, expectedContent string) {
 // path to the compiled executable. It is safe to call from TestMain.
 // The caller is responsible for removing the returned file when done.
 func BuildBinary(moduleRoot string) (string, error) {
-	out := filepath.Join(os.TempDir(), fmt.Sprintf("lsq_integration_test_%d", os.Getpid()))
+	tmpFile, err := os.CreateTemp("", "lsq_integration_test_*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file for build output: %w", err)
+	}
+	out := tmpFile.Name()
+	if err := tmpFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp file for build output: %w", err)
+	}
+	if err := os.Remove(out); err != nil {
+		return "", fmt.Errorf("failed to remove temp file before build: %w", err)
+	}
 	cmd := exec.Command("go", "build", "-o", out, ".")
 	cmd.Dir = moduleRoot
 	cmd.Stdout = os.Stderr // build output goes to test stderr

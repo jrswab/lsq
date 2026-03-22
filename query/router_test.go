@@ -17,6 +17,7 @@ func mockHTTPExecutor(ctx context.Context, expr string) query.AdvancedResult {
 	}
 }
 
+// TestRunSimple_AutoResolvesToHTTP verifies auto backend dispatch for simple queries.
 func TestRunSimple_AutoResolvesToHTTP(t *testing.T) {
 	res, err := query.RunSimple(context.Background(), "auto", "[[logseq]]", mockHTTPExecutor)
 	if err != nil {
@@ -30,6 +31,7 @@ func TestRunSimple_AutoResolvesToHTTP(t *testing.T) {
 	}
 }
 
+// TestRunSimple_HTTPWorks verifies explicit HTTP backend dispatch.
 func TestRunSimple_HTTPWorks(t *testing.T) {
 	res, err := query.RunSimple(context.Background(), "http", "(task now)", mockHTTPExecutor)
 	if err != nil {
@@ -43,6 +45,7 @@ func TestRunSimple_HTTPWorks(t *testing.T) {
 	}
 }
 
+// TestRunSimple_RejectUnsupported rejects unsupported simple backends.
 func TestRunSimple_RejectUnsupported(t *testing.T) {
 	// e.g. "file" or "local" should yield explicit errors since they're disabled in Phase 2.
 	_, err := query.RunSimple(context.Background(), "file", "[[logseq]]", mockHTTPExecutor)

@@ -14,6 +14,7 @@ import (
 	"github.com/jrswab/lsq/cmd"
 )
 
+// TestRunQuery_DoctorJSON verifies JSON rendering for the doctor subcommand.
 func TestRunQuery_DoctorJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -43,6 +44,7 @@ func TestRunQuery_DoctorJSON(t *testing.T) {
 	}
 }
 
+// TestRunQuery_DoctorNDJSON verifies NDJSON rendering for the doctor subcommand.
 func TestRunQuery_DoctorNDJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -69,6 +71,7 @@ func TestRunQuery_DoctorNDJSON(t *testing.T) {
 	}
 }
 
+// TestRunQuery_DoctorText verifies text rendering for the doctor subcommand.
 func TestRunQuery_DoctorText(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -91,6 +94,7 @@ func TestRunQuery_DoctorText(t *testing.T) {
 	}
 }
 
+// TestRunQuery_DoctorDefaultFormat verifies the default doctor output format.
 func TestRunQuery_DoctorDefaultFormat(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -114,6 +118,7 @@ func TestRunQuery_DoctorDefaultFormat(t *testing.T) {
 	}
 }
 
+// TestRunQuery_UnsupportedFormat rejects unknown output formats.
 func TestRunQuery_UnsupportedFormat(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -129,6 +134,7 @@ func TestRunQuery_UnsupportedFormat(t *testing.T) {
 	}
 }
 
+// TestRunQuery_UnsupportedBackend rejects unsupported backends for HTTP-only commands.
 func TestRunQuery_UnsupportedBackend(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -144,6 +150,39 @@ func TestRunQuery_UnsupportedBackend(t *testing.T) {
 	}
 }
 
+// TestRunQuery_DoctorRejectsAdvancedFlags rejects flags that do not belong to doctor.
+func TestRunQuery_DoctorRejectsAdvancedFlags(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"doctor", "--query", "[:find ?e]"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "--query") {
+		t.Errorf("expected invalid flag error, got: %s", stderr.String())
+	}
+}
+
+// TestRunQuery_DoctorRejectsExtraArgs rejects unexpected positional arguments.
+func TestRunQuery_DoctorRejectsExtraArgs(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"doctor", "oops"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "unexpected argument(s): oops") {
+		t.Errorf("expected extras error, got: %s", stderr.String())
+	}
+}
+
+// TestRunQuery_NoSubcommand reports usage when no query subcommand is provided.
 func TestRunQuery_NoSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery([]string{}, &stdout, &stderr)
@@ -157,6 +196,7 @@ func TestRunQuery_NoSubcommand(t *testing.T) {
 	}
 }
 
+// TestRunQuery_UnknownSubcommand rejects unknown query subcommands.
 func TestRunQuery_UnknownSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -176,6 +216,7 @@ func TestRunQuery_UnknownSubcommand(t *testing.T) {
 	}
 }
 
+// TestRunQuery_BackendAutoResolvesToHTTP confirms auto backend uses HTTP.
 func TestRunQuery_BackendAutoResolvesToHTTP(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -241,6 +282,7 @@ func TestRunQuery_AdvancedJSON(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedNDJSON verifies NDJSON rendering for advanced queries.
 func TestRunQuery_AdvancedNDJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -270,6 +312,7 @@ func TestRunQuery_AdvancedNDJSON(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedText verifies text rendering for advanced queries.
 func TestRunQuery_AdvancedText(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -292,6 +335,7 @@ func TestRunQuery_AdvancedText(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedFileInput loads advanced query text from a file.
 func TestRunQuery_AdvancedFileInput(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -302,7 +346,9 @@ func TestRunQuery_AdvancedFileInput(t *testing.T) {
 	// Write a query file.
 	tmpDir := t.TempDir()
 	queryPath := filepath.Join(tmpDir, "query.edn")
-	os.WriteFile(queryPath, []byte("[:find ?e . :where [?e :block/uuid]]\n"), 0644)
+	if err := os.WriteFile(queryPath, []byte("[:find ?e . :where [?e :block/uuid]]\n"), 0644); err != nil {
+		t.Fatalf("failed to write query fixture %q: %v", queryPath, err)
+	}
 
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -323,6 +369,7 @@ func TestRunQuery_AdvancedFileInput(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedMissingQuery rejects advanced calls without query input.
 func TestRunQuery_AdvancedMissingQuery(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -338,6 +385,7 @@ func TestRunQuery_AdvancedMissingQuery(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedWhitespaceOnlyQuery rejects blank advanced query text.
 func TestRunQuery_AdvancedWhitespaceOnlyQuery(t *testing.T) {
 	// A --query value that is nothing but whitespace must be treated as absent,
 	// matching the trimming already applied to --file content.
@@ -355,10 +403,13 @@ func TestRunQuery_AdvancedWhitespaceOnlyQuery(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedBothQueryAndFile rejects conflicting advanced inputs.
 func TestRunQuery_AdvancedBothQueryAndFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	queryPath := filepath.Join(tmpDir, "query.edn")
-	os.WriteFile(queryPath, []byte("[:find ?e :where [?e :block/uuid]]"), 0644)
+	if err := os.WriteFile(queryPath, []byte("[:find ?e :where [?e :block/uuid]]"), 0644); err != nil {
+		t.Fatalf("failed to write query fixture %q: %v", queryPath, err)
+	}
 
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -374,6 +425,7 @@ func TestRunQuery_AdvancedBothQueryAndFile(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedFileNotFound reports missing advanced query files.
 func TestRunQuery_AdvancedFileNotFound(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -389,10 +441,13 @@ func TestRunQuery_AdvancedFileNotFound(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedEmptyFile rejects empty advanced query files.
 func TestRunQuery_AdvancedEmptyFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	queryPath := filepath.Join(tmpDir, "empty.edn")
-	os.WriteFile(queryPath, []byte("   \n  "), 0644)
+	if err := os.WriteFile(queryPath, []byte("   \n  "), 0644); err != nil {
+		t.Fatalf("failed to write query fixture %q: %v", queryPath, err)
+	}
 
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -408,6 +463,7 @@ func TestRunQuery_AdvancedEmptyFile(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedBackendValidation enforces advanced backend policy.
 func TestRunQuery_AdvancedBackendValidation(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -423,6 +479,7 @@ func TestRunQuery_AdvancedBackendValidation(t *testing.T) {
 	}
 }
 
+// TestRunQuery_DoctorStillWorksAfterAdvanced guards doctor after advanced wiring.
 func TestRunQuery_DoctorStillWorksAfterAdvanced(t *testing.T) {
 	// Confirm doctor path is not broken by the advanced addition.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -457,7 +514,11 @@ func TestRunQuery_SimpleJSON(t *testing.T) {
 			Method string `json:"method"`
 			Args   []any  `json:"args"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
 		if req.Method != "logseq.DB.q" {
 			t.Errorf("expected method logseq.DB.q, got %q", req.Method)
 		}
@@ -494,6 +555,7 @@ func TestRunQuery_SimpleJSON(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleTaskNowJSON verifies remote simple task query JSON output.
 func TestRunQuery_SimpleTaskNowJSON(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -520,6 +582,7 @@ func TestRunQuery_SimpleTaskNowJSON(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleText verifies text rendering for simple queries.
 func TestRunQuery_SimpleText(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -542,6 +605,7 @@ func TestRunQuery_SimpleText(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleMissingExpr rejects simple queries without --expr.
 func TestRunQuery_SimpleMissingExpr(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -557,6 +621,7 @@ func TestRunQuery_SimpleMissingExpr(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleWhitespaceOnlyExpr rejects blank simple expressions.
 func TestRunQuery_SimpleWhitespaceOnlyExpr(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -572,6 +637,7 @@ func TestRunQuery_SimpleWhitespaceOnlyExpr(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleBackendFileRejected rejects file backend during remote simple phases.
 func TestRunQuery_SimpleBackendFileRejected(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -587,6 +653,7 @@ func TestRunQuery_SimpleBackendFileRejected(t *testing.T) {
 	}
 }
 
+// TestRunQuery_DoctorStillWorksAfterSimple guards doctor after simple routing changes.
 func TestRunQuery_DoctorStillWorksAfterSimple(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -612,6 +679,7 @@ func TestRunQuery_DoctorStillWorksAfterSimple(t *testing.T) {
 	}
 }
 
+// TestRunQuery_AdvancedStillWorksAfterSimple guards advanced after simple routing changes.
 func TestRunQuery_AdvancedStillWorksAfterSimple(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -637,13 +705,18 @@ func TestRunQuery_AdvancedStillWorksAfterSimple(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleMacroSupported accepts wrapped page-ref simple queries.
 func TestRunQuery_SimpleMacroSupported(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Method string `json:"method"`
 			Args   []any  `json:"args"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
 		if len(req.Args) == 0 || req.Args[0] != "(task now)" {
 			t.Errorf("expected stripped payload '(task now)', got %v", req.Args)
 		}
@@ -663,12 +736,17 @@ func TestRunQuery_SimpleMacroSupported(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleMacroSupported_PageProperty accepts wrapped page-property queries.
 func TestRunQuery_SimpleMacroSupported_PageProperty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Args []any `json:"args"`
 		}
-		json.NewDecoder(r.Body).Decode(&req)
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("failed to decode request body: %v", err)
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
 		if len(req.Args) == 0 || req.Args[0] != "(page-property type project)" {
 			t.Errorf("expected stripped payload '(page-property type project)', got %v", req.Args)
 		}
@@ -688,6 +766,7 @@ func TestRunQuery_SimpleMacroSupported_PageProperty(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleMacroRejected_Maps rejects wrapped EDN map inputs.
 func TestRunQuery_SimpleMacroRejected_Maps(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -703,6 +782,7 @@ func TestRunQuery_SimpleMacroRejected_Maps(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleMacroRejected_Datalog rejects wrapped Datalog inputs.
 func TestRunQuery_SimpleMacroRejected_Datalog(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -718,6 +798,7 @@ func TestRunQuery_SimpleMacroRejected_Datalog(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleMacroRejected_BeginQuery rejects BEGIN_QUERY blocks.
 func TestRunQuery_SimpleMacroRejected_BeginQuery(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -733,6 +814,7 @@ func TestRunQuery_SimpleMacroRejected_BeginQuery(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleMacroRejected_UnknownWrappedForm rejects unsupported wrapped DSL forms.
 func TestRunQuery_SimpleMacroRejected_UnknownWrappedForm(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := cmd.RunQuery(
@@ -747,4 +829,3 @@ func TestRunQuery_SimpleMacroRejected_UnknownWrappedForm(t *testing.T) {
 		t.Errorf("expected subset rejection error, got: %s", stderr.String())
 	}
 }
-

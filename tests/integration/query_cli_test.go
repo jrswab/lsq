@@ -16,6 +16,7 @@ import (
 var lsqBinary string
 
 // TestMain builds the lsq binary once for the package, then runs the tests.
+// TestMain builds the lsq test binary once for integration tests.
 func TestMain(m *testing.M) {
 	// Locate the module root (two levels up from tests/integration/).
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
@@ -30,9 +31,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	lsqBinary = bin
-	defer os.Remove(bin)
-
-	os.Exit(m.Run())
+	code := m.Run()
+	_ = os.Remove(bin)
+	os.Exit(code)
 }
 
 // --- query doctor integration tests ---
@@ -93,6 +94,7 @@ func TestQueryCLI_DoctorJSON_Healthy(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_DoctorJSON_Unreachable reports transport failures in JSON output.
 func TestQueryCLI_DoctorJSON_Unreachable(t *testing.T) {
 	// Port 1 is always refused on loopback.
 	res := RunCLI(lsqBinary, []string{
@@ -117,6 +119,7 @@ func TestQueryCLI_DoctorJSON_Unreachable(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_DoctorNDJSON_Healthy verifies NDJSON doctor output from the built binary.
 func TestQueryCLI_DoctorNDJSON_Healthy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -143,6 +146,7 @@ func TestQueryCLI_DoctorNDJSON_Healthy(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_DoctorText_Healthy verifies text doctor output from the built binary.
 func TestQueryCLI_DoctorText_Healthy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -217,6 +221,7 @@ func TestQueryCLI_AdvancedJSON_Success(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_AdvancedJSON_BothMethodsFail reports advanced query failures cleanly.
 func TestQueryCLI_AdvancedJSON_BothMethodsFail(t *testing.T) {
 	// Server always returns 401 → both methods fail → non-zero exit.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -247,6 +252,7 @@ func TestQueryCLI_AdvancedJSON_BothMethodsFail(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_AdvancedNDJSON_ExpandsResults emits one line per advanced result row.
 func TestQueryCLI_AdvancedNDJSON_ExpandsResults(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -277,6 +283,7 @@ func TestQueryCLI_AdvancedNDJSON_ExpandsResults(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_AdvancedText_Success pretty-prints successful advanced results.
 func TestQueryCLI_AdvancedText_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -299,6 +306,7 @@ func TestQueryCLI_AdvancedText_Success(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_AdvancedFileInput loads advanced query text from disk.
 func TestQueryCLI_AdvancedFileInput(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -309,7 +317,9 @@ func TestQueryCLI_AdvancedFileInput(t *testing.T) {
 	// Write a query file.
 	tmpDir := t.TempDir()
 	queryPath := filepath.Join(tmpDir, "query.edn")
-	os.WriteFile(queryPath, []byte("[:find ?e . :where [?e :block/uuid]]\n"), 0644)
+	if err := os.WriteFile(queryPath, []byte("[:find ?e . :where [?e :block/uuid]]\n"), 0644); err != nil {
+		t.Fatalf("failed to write query file: %v", err)
+	}
 
 	res := RunCLI(lsqBinary, []string{
 		"query", "advanced",
@@ -344,6 +354,7 @@ func TestQueryCLI_AdvancedMissingQuery(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_UnsupportedFormat rejects unknown render formats in the built binary.
 func TestQueryCLI_UnsupportedFormat(t *testing.T) {
 	res := RunCLI(lsqBinary, []string{"query", "doctor", "--format", "xml"})
 
@@ -355,6 +366,7 @@ func TestQueryCLI_UnsupportedFormat(t *testing.T) {
 	}
 }
 
+// TestQueryCLI_UnknownSubcommand rejects unknown query subcommands in the built binary.
 func TestQueryCLI_UnknownSubcommand(t *testing.T) {
 	res := RunCLI(lsqBinary, []string{"query", "magic"})
 
