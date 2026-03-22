@@ -168,7 +168,7 @@ Responsibilities:
 
 - detect whether the API is reachable
 - detect whether database query methods are available
-- execute `logseq.DB.q` or `logseq.DB.datascriptQuery`
+- execute `logseq.DB.datascriptQuery` for advanced Datalog queries
 - return machine-readable results and explicit failure modes
 
 The Phase 1 backend contract should be written against the observed request shape used by third-party integrations in this workspace:
@@ -178,14 +178,14 @@ The Phase 1 backend contract should be written against the observed request shap
 
 ```json
 {
-  "method": "logseq.DB.q",
+  "method": "logseq.DB.datascriptQuery",
   "args": ["[:find ?name :where [?p :block/name ?name]]"]
 }
 ```
 
 - auth: bearer token when configured
 
-The implementation should also support `logseq.DB.datascriptQuery` as a fallback when appropriate.
+Advanced queries should be routed exclusively to `logseq.DB.datascriptQuery`. `logseq.DB.q` is reserved for simple DSL inputs.
 
 ### File Backend
 
@@ -289,7 +289,7 @@ Illustrative JSON response:
 {
   "backend": "http",
   "input_kind": "advanced",
-  "query_method": "logseq.DB.q",
+  "query_method": "logseq.DB.datascriptQuery",
   "results": [],
   "warnings": [],
   "error": null
@@ -417,3 +417,11 @@ Recommended order:
 5. only then start Phase 2 local DSL work
 
 This revision intentionally trades breadth for implementability.
+
+## Appendix: Logseq API Routing Boundary
+
+Based on verified observation of the active Logseq HTTP server, `lsq` must enforce a rigid boundary between simple and advanced execution entrypoints:
+
+- **`logseq.DB.q`**: Operates on simple DSL shapes only (e.g., `[[logseq]]`, `(task now)`, `(between ...)`). It returns arrays of IDs/blocks when given simple DSL. It outputs `null` (or fails) on advanced EDN maps and most `{{query ...}}` forms.
+- **`logseq.DB.datascriptQuery`**: Operates purely on DataScript/Datalog representations. It expects raw advanced arrays / EDN formats.
+- **Macro Stripping (`{{query (...)}}`)**: Stripping exterior query braces and piping the inner token block is valid only if the innards definitively consist of **simple DSL** routed into `DB.q` (e.g. `{{query (task now)}}` → `(task now)`). Do not strip macros hoping `DB.q` or `datascriptQuery` can interpret arbitrary internal render properties—they belong exclusively to the frontend UI renderer, not the core DB interface.

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add Phase 1 Logseq query support to `lsq` by validating the Logseq HTTP API, implementing `query doctor`, and executing advanced queries through `logseq.DB.q` or `logseq.DB.datascriptQuery` with structured output.
+**Goal:** Add Phase 1 Logseq query support to `lsq` by validating the Logseq HTTP API, implementing `query doctor`, and executing advanced queries directly through `logseq.DB.datascriptQuery` with structured output.
 
 **Architecture:** Phase 1 is HTTP-only. It adds a small query command surface on top of the existing CLI, a focused HTTP API client, and stable result formatting. It does not implement a local query engine or file backend fallback.
 
@@ -112,8 +112,7 @@ func RunAdvancedQuery(ctx context.Context, c *Client, query string) (query.Advan
 Behavior:
 - send `POST /api`
 - add `Authorization: Bearer <token>` only when configured
-- try `logseq.DB.q` first
-- fallback to `logseq.DB.datascriptQuery`
+- dispatch directly to `logseq.DB.datascriptQuery`
 - preserve raw response bytes for later formatting
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -500,3 +499,28 @@ git status --short
 ```
 
 Expected: clean working tree
+
+## Task 8: Align Advanced Query Routing to Verified API
+
+**Files:**
+- Modify: `./query/backend/httpapi/execute.go`
+- Modify: `./query/backend/httpapi/client_test.go`
+
+- [ ] **Step 1: Simplify RunAdvancedQuery**
+Remove the `logseq.DB.q` attempt and fallback logic entirely. Route advanced queries exclusively to `logseq.DB.datascriptQuery`.
+
+- [ ] **Step 2: Clean up tests and helpers**
+Remove the deprecated test instances targeting `DB.q` fallback validations specifically checking how `RunAdvancedQuery` recovered. Evaluate if `isJSONNull` is still beneficial or requires culling.
+
+- [ ] **Step 3: Run final verification**
+Run:
+```bash
+go test ./...
+```
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+```bash
+git add query/backend/httpapi/execute.go query/backend/httpapi/client_test.go
+git commit -m "refactor: align advanced query routing directly to datascriptQuery"
+```
