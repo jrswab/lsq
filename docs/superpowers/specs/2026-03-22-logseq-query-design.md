@@ -1,7 +1,7 @@
 # lsq Logseq Query Design
 
 Date: 2026-03-22
-Repo: `/Users/tr/Workspace/logseq/logseq-clis/lsq`
+Repo: `./`
 Status: Proposed, revised after review
 
 ## Goal
@@ -29,9 +29,9 @@ It currently supports:
 
 Relevant code:
 
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/main.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/system/journal.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/trie/trie.go`
+- `./main.go`
+- `./system/journal.go`
+- `./trie/trie.go`
 
 It does not currently have:
 
@@ -156,7 +156,7 @@ Not supported in the local DSL for the first local phase:
 - `NOW`, `LATER`, `WAITING`
 - page-level property filtering
 
-The restriction to `TODO|DOING|DONE` is deliberate and matches the repo's existing TODO model in `/Users/tr/Workspace/logseq/logseq-clis/lsq/todo/todo.go`.
+The restriction to `TODO|DOING|DONE` is deliberate and matches the repo's existing TODO model in `./todo/todo.go`.
 
 ## Backend Strategy
 
@@ -334,21 +334,21 @@ This is intentionally smaller than the original draft and matches what can be re
 
 Phase 1 package additions:
 
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/cmd/query.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/result.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/execute.go`
+- `./cmd/query.go`
+- `./query/result.go`
+- `./query/router.go`
+- `./query/backend/httpapi/client.go`
+- `./query/backend/httpapi/execute.go`
 
 Phase 2 additions:
 
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/types.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/parser/simple.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/compile/simple_to_plan.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/model.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/parser_markdown.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/index.go`
-- `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/file/execute.go`
+- `./query/types.go`
+- `./query/parser/simple.go`
+- `./query/compile/simple_to_plan.go`
+- `./query/backend/file/model.go`
+- `./query/backend/file/parser_markdown.go`
+- `./query/backend/file/index.go`
+- `./query/backend/file/execute.go`
 
 Org support is not Phase 2 by default. It should be a later follow-up unless real user demand appears.
 
@@ -397,7 +397,7 @@ File execution tests:
 - logical combinations
 - empty results
 
-The repo's existing integration helper under `/Users/tr/Workspace/logseq/logseq-clis/lsq/tests/integration/integration.go` can help with temporary directories and env setup, but it is not by itself a complete integration framework. Phase 1 will need explicit CLI and HTTP test helpers.
+The repo's existing integration helper under `./tests/integration/integration.go` can help with temporary directories and env setup, but it is not by itself a complete integration framework. Phase 1 will need explicit CLI and HTTP test helpers.
 
 ## Risks
 

@@ -12,51 +12,51 @@
 
 ## File Map
 
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/main.go`
+- Modify: `./main.go`
   Purpose: route `lsq query ...` before existing flat-flag behavior while preserving all current non-query flows.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/cmd/query.go`
+- Create: `./cmd/query.go`
   Purpose: importable query command entrypoint so tests do not need to call package `main` directly.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/result.go`
+- Create: `./query/result.go`
   Purpose: shared result and doctor output types for `text|json|ndjson`.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router.go`
+- Create: `./query/router.go`
   Purpose: parse query subcommands and validate arguments, including `--explain`.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client.go`
+- Create: `./query/backend/httpapi/client.go`
   Purpose: HTTP API transport, auth handling, probe methods, and raw request helpers.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/execute.go`
+- Create: `./query/backend/httpapi/execute.go`
   Purpose: doctor probing and advanced-query execution built on top of the HTTP client.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client_test.go`
+- Create: `./query/backend/httpapi/client_test.go`
   Purpose: `httptest` coverage for reachability, auth, fallback, malformed responses, and timeouts.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router_test.go`
+- Create: `./query/router_test.go`
   Purpose: unit coverage for `query doctor`, `query advanced`, backend parsing, and `--explain`.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/cmd/query_test.go`
+- Create: `./cmd/query_test.go`
   Purpose: command-level coverage without involving package `main`.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/tests/integration/query_cli_test.go`
+- Create: `./tests/integration/query_cli_test.go`
   Purpose: CLI-level integration tests using `os/exec`, a mock HTTP server, and the built binary.
 
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/tests/integration/legacy_cli_smoke_test.go`
+- Create: `./tests/integration/legacy_cli_smoke_test.go`
   Purpose: regression coverage for existing non-query CLI behavior after main entrypoint changes.
 
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/README.md`
+- Modify: `./README.md`
   Purpose: document `query doctor` and `query advanced`.
 
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/CHANGELOG.md`
+- Modify: `./CHANGELOG.md`
   Purpose: record the new Phase 1 query capability.
 
 ## Task 1: Validate the Logseq HTTP API Contract
 
 **Files:**
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client_test.go`
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client.go`
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/execute.go`
+- Create: `./query/backend/httpapi/client_test.go`
+- Create: `./query/backend/httpapi/client.go`
+- Create: `./query/backend/httpapi/execute.go`
 
 - [ ] **Step 1: Write the failing probe tests**
 
@@ -136,8 +136,8 @@ git commit -m "feat: add Logseq HTTP query client"
 ## Task 2: Add Stable Result Types
 
 **Files:**
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/result.go`
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/result_test.go`
+- Create: `./query/result.go`
+- Create: `./query/result_test.go`
 
 - [ ] **Step 1: Write the failing result-format tests**
 
@@ -210,11 +210,11 @@ git commit -m "feat: add query result models and renderers"
 ## Task 3: Route `lsq query doctor`
 
 **Files:**
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/main.go`
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/cmd/query.go`
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/cmd/query_test.go`
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router.go`
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router_test.go`
+- Modify: `./main.go`
+- Create: `./cmd/query.go`
+- Create: `./cmd/query_test.go`
+- Create: `./query/router.go`
+- Create: `./query/router_test.go`
 
 - [ ] **Step 1: Write the failing router tests**
 
@@ -270,9 +270,9 @@ git commit -m "feat: add query doctor command routing"
 ## Task 4: Implement `lsq query advanced`
 
 **Files:**
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router.go`
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/router_test.go`
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/query/backend/httpapi/client.go`
+- Modify: `./query/router.go`
+- Modify: `./query/router_test.go`
+- Modify: `./query/backend/httpapi/client.go`
 
 - [ ] **Step 1: Write the failing advanced-query tests**
 
@@ -326,8 +326,8 @@ git commit -m "feat: add advanced query passthrough"
 ## Task 5: Add CLI Integration Coverage
 
 **Files:**
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/tests/integration/query_cli_test.go`
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/tests/integration/integration.go`
+- Create: `./tests/integration/query_cli_test.go`
+- Modify: `./tests/integration/integration.go`
 
 - [ ] **Step 1: Write failing CLI integration tests**
 
@@ -382,7 +382,7 @@ git commit -m "test: add query CLI integration coverage"
 ## Task 6: Add Regression Coverage for Existing CLI Behavior
 
 **Files:**
-- Create: `/Users/tr/Workspace/logseq/logseq-clis/lsq/tests/integration/legacy_cli_smoke_test.go`
+- Create: `./tests/integration/legacy_cli_smoke_test.go`
 
 - [ ] **Step 1: Write the failing regression tests**
 
@@ -426,8 +426,8 @@ git commit -m "test: cover legacy CLI after query routing"
 ## Task 7: Document the Feature
 
 **Files:**
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/README.md`
-- Modify: `/Users/tr/Workspace/logseq/logseq-clis/lsq/CHANGELOG.md`
+- Modify: `./README.md`
+- Modify: `./CHANGELOG.md`
 
 - [ ] **Step 1: Write the failing doc check**
 
