@@ -144,6 +144,15 @@ Test the API connection and capabilities:
 lsq query doctor
 ```
 
+Execute raw simple DSL queries via `logseq.DB.q`:
+```bash
+lsq query simple --expr '[[logseq]]'
+lsq query simple --expr '(task now)'
+lsq query simple --expr '(and [[logseq]] #TypeScript)'
+lsq query simple --expr '(page-property type project)'
+```
+*Note: This strictly passes native Logseq DSL; it does not parse or strip `{{query ...}}` macros.*
+
 Execute raw advanced Datalog queries:
 ```bash
 lsq query advanced --query '[:find ?name :where [?p :block/name ?name]]'
@@ -154,11 +163,11 @@ lsq query advanced --file ./my_query.edn
 Available via `--format <format>`:
 - `text` (default): Human-readable CLI output.
 - `json`: Structured JSON result envelope (e.g., `{"backend": "http", "results": [...]}`).
-- `ndjson`: Newline-delimited JSON. `doctor` prints one line; `advanced` expands result rows only when the result is a warning-free array.
+- `ndjson`: Newline-delimited JSON. `doctor` prints one line; `advanced` and `simple` expand result rows only when the result is a warning-free array.
 
 ### Current Limitations
-- Query support is currently HTTP-only.
-- No support for simple queries.
+- Query support is currently HTTP-only (no local file backend).
+- Simple queries do not perform macro stripping or support advanced EDN payloads.
 - `--backend` currently accepts `auto` or `http`, though both resolve to HTTP.
 - `--explain` is parsed but not yet implemented.
 
