@@ -1,0 +1,594 @@
+package query_test
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/jrswab/lsq/query"
+)
+
+// --- helpers ---
+
+func strPtr(s string) *string { return &s }
+
+func mustJSON(t *testing.T, data []byte) map[string]any {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("failed to unmarshal JSON: %v\nbody: %s", err, data)
+	}
+	return m
+}
+
+// --- DoctorResult JSON ---
+
+func TestRenderResult_DoctorJSON_AllHealthy(t *testing.T) {
+	dr := query.DoctorResult{
+		Backend:  "http",
+		Command:  "doctor",
+		APIURL:   "http://127.0.0.1:12315/api",
+		Reachable: true,
+		Auth: query.DoctorAuth{
+			Configured: true,
+			Succeeded:  true,
+		},
+		Capabilities: query.DoctorCapabilities{
+			DBQ:             true,
+			DatascriptQuery: true,
+		},
+		Warnings: []string{},
+		Error:    nil,
+	}
+
+	out, err := query.RenderResult("json", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := mustJSON(t, out)
+
+	// Verify key fields match spec illustrative output.
+	if m["backend"] != "http" {
+		t.Errorf("backend=%v, want http", m["backend"])
+	}
+	if m["command"] != "doctor" {
+		t.Errorf("command=%v, want doctor", m["command"])
+	}
+	if m["api_url"] != "http://127.0.0.1:12315/api" {
+		t.Errorf("api_url=%v", m["api_url"])
+	}
+	if m["reachable"] != true {
+		t.Errorf("reachable=%v", m["reachable"])
+	}
+	if m["error"] != nil {
+		t.Errorf("error=%v, want null", m["error"])
+	}
+
+	// Warnings should be an empty array, not null.
+	warnings, ok := m["warnings"].([]any)
+	if !ok || warnings == nil {
+		t.Errorf("warnings should be [], got %v", m["warnings"])
+	}
+	if len(warnings) != 0 {
+		t.Errorf("warnings should be empty, got %v", warnings)
+	}
+
+	// Auth nested object.
+	auth, ok := m["auth"].(map[string]any)
+	if !ok {
+		t.Fatalf("auth not an object: %v", m["auth"])
+	}
+	if auth["configured"] != true {
+		t.Errorf("auth.configured=%v", auth["configured"])
+	}
+	if auth["succeeded"] != true {
+		t.Errorf("auth.succeeded=%v", auth["succeeded"])
+	}
+
+	// Capabilities nested object.
+	caps, ok := m["capabilities"].(map[string]any)
+	if !ok {
+		t.Fatalf("capabilities not an object: %v", m["capabilities"])
+	}
+	if caps["db_q"] != true {
+		t.Errorf("capabilities.db_q=%v", caps["db_q"])
+	}
+	if caps["datascript_query"] != true {
+		t.Errorf("capabilities.datascript_query=%v", caps["datascript_query"])
+	}
+
+	// Must end with newline.
+	if out[len(out)-1] != '\n' {
+		t.Error("json output should end with newline")
+	}
+}
+
+func TestRenderResult_DoctorJSON_WithError(t *testing.T) {
+	dr := query.DoctorResult{
+		Backend:  "http",
+		Command:  "doctor",
+		APIURL:   "http://127.0.0.1:12315/api",
+		Warnings: []string{"logseq.DB.q not available"},
+		Error:    strPtr("auth failed with status 401"),
+	}
+
+	out, err := query.RenderResult("json", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := mustJSON(t, out)
+
+	if m["error"] != "auth failed with status 401" {
+		t.Errorf("error=%v", m["error"])
+	}
+	warnings := m["warnings"].([]any)
+	if len(warnings) != 1 || warnings[0] != "logseq.DB.q not available" {
+		t.Errorf("warnings=%v", warnings)
+	}
+}
+
+func TestRenderResult_DoctorJSON_NilWarningsBecomesEmptyArray(t *testing.T) {
+	// Warnings must serialize as [] not null when the slice is non-nil but empty.
+	dr := query.DoctorResult{
+		Backend:  "http",
+		Command:  "doctor",
+		Warnings: []string{},
+	}
+
+	out, err := query.RenderResult("json", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check raw JSON contains "warnings":[] not "warnings":null.
+	if strings.Contains(string(out), `"warnings":null`) {
+		t.Error("warnings should be [], not null")
+	}
+}
+
+// --- AdvancedResult JSON ---
+
+func TestRenderResult_AdvancedJSON_Success(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		InputKind:   "advanced",
+		QueryMethod: "logseq.DB.q",
+		Results:     json.RawMessage(`[["page-a"],["page-b"]]`),
+		Warnings:    []string{},
+		Error:       nil,
+	}
+
+	out, err := query.RenderResult("json", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := mustJSON(t, out)
+	if m["backend"] != "http" {
+		t.Errorf("backend=%v", m["backend"])
+	}
+	if m["input_kind"] != "advanced" {
+		t.Errorf("input_kind=%v", m["input_kind"])
+	}
+	if m["query_method"] != "logseq.DB.q" {
+		t.Errorf("query_method=%v", m["query_method"])
+	}
+	if m["error"] != nil {
+		t.Errorf("error=%v, want null", m["error"])
+	}
+
+	results, ok := m["results"].([]any)
+	if !ok {
+		t.Fatalf("results is not an array: %T %v", m["results"], m["results"])
+	}
+	if len(results) != 2 {
+		t.Errorf("results length=%d, want 2", len(results))
+	}
+}
+
+func TestRenderResult_AdvancedJSON_EmptyResults(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		InputKind:   "advanced",
+		QueryMethod: "logseq.DB.q",
+		Results:     json.RawMessage(`[]`),
+		Warnings:    []string{},
+	}
+
+	out, err := query.RenderResult("json", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := mustJSON(t, out)
+	results := m["results"].([]any)
+	if len(results) != 0 {
+		t.Errorf("expected empty results, got %v", results)
+	}
+}
+
+func TestRenderResult_AdvancedJSON_NullResults(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		InputKind:   "advanced",
+		QueryMethod: "",
+		Results:     json.RawMessage(`null`),
+		Warnings:    []string{},
+		Error:       strPtr("both methods failed"),
+	}
+
+	out, err := query.RenderResult("json", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := mustJSON(t, out)
+	if m["results"] != nil {
+		t.Errorf("expected null results, got %v", m["results"])
+	}
+	if m["error"] != "both methods failed" {
+		t.Errorf("error=%v", m["error"])
+	}
+}
+
+func TestRenderResult_AdvancedJSON_WithFallbackWarning(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		InputKind:   "advanced",
+		QueryMethod: "logseq.DB.datascriptQuery",
+		Results:     json.RawMessage(`[["result"]]`),
+		Warnings:    []string{"logseq.DB.q failed, used datascriptQuery fallback"},
+	}
+
+	out, err := query.RenderResult("json", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	m := mustJSON(t, out)
+	warnings := m["warnings"].([]any)
+	if len(warnings) != 1 {
+		t.Errorf("expected 1 warning, got %d", len(warnings))
+	}
+}
+
+// --- NDJSON ---
+
+func TestRenderResult_DoctorNDJSON(t *testing.T) {
+	// Doctor result in ndjson is a single line (same as json).
+	dr := query.DoctorResult{
+		Backend:  "http",
+		Command:  "doctor",
+		APIURL:   "http://127.0.0.1:12315/api",
+		Reachable: true,
+		Warnings: []string{},
+	}
+
+	out, err := query.RenderResult("ndjson", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 ndjson line for doctor, got %d", len(lines))
+	}
+
+	// Each line must be valid JSON.
+	if !json.Valid([]byte(lines[0])) {
+		t.Errorf("ndjson line is not valid JSON: %s", lines[0])
+	}
+}
+
+func TestRenderResult_AdvancedNDJSON_ExpandsResults(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		InputKind:   "advanced",
+		QueryMethod: "logseq.DB.q",
+		Results:     json.RawMessage(`[["page-a"],["page-b"],{"key":"val"}]`),
+		Warnings:    []string{},
+	}
+
+	out, err := query.RenderResult("ndjson", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Errorf("expected 3 ndjson lines (one per result), got %d: %v", len(lines), lines)
+	}
+
+	for i, line := range lines {
+		if !json.Valid([]byte(line)) {
+			t.Errorf("line %d is not valid JSON: %s", i, line)
+		}
+	}
+
+	// Verify content of individual lines.
+	if lines[0] != `["page-a"]` {
+		t.Errorf("line 0: %s", lines[0])
+	}
+	if lines[2] != `{"key":"val"}` {
+		t.Errorf("line 2: %s", lines[2])
+	}
+}
+
+func TestRenderResult_AdvancedNDJSON_ErrorFallsBackToEnvelope(t *testing.T) {
+	// When there is an error, ndjson emits the full envelope as one line
+	// so error/warning context is not lost.
+	ar := query.AdvancedResult{
+		Backend:  "http",
+		Results:  json.RawMessage(`null`),
+		Warnings: []string{},
+		Error:    strPtr("transport error"),
+	}
+
+	out, err := query.RenderResult("ndjson", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 ndjson line for error result, got %d", len(lines))
+	}
+
+	m := mustJSON(t, []byte(lines[0]))
+	if m["error"] != "transport error" {
+		t.Errorf("error=%v", m["error"])
+	}
+}
+
+func TestRenderResult_AdvancedNDJSON_EmptyResults(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		QueryMethod: "logseq.DB.q",
+		Results:     json.RawMessage(`[]`),
+		Warnings:    []string{},
+	}
+
+	out, err := query.RenderResult("ndjson", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Empty array → no result lines, but we still get the envelope.
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	// 0 result items → falls through to envelope (results is empty).
+	if !json.Valid([]byte(lines[0])) {
+		t.Errorf("expected valid JSON line, got: %s", lines[0])
+	}
+}
+
+func TestRenderResult_AdvancedNDJSON_ScalarResult(t *testing.T) {
+	// If results is a scalar (not an array), emit the full envelope.
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		QueryMethod: "logseq.DB.q",
+		Results:     json.RawMessage(`42`),
+		Warnings:    []string{},
+	}
+
+	out, err := query.RenderResult("ndjson", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	if len(lines) != 1 {
+		t.Errorf("expected 1 ndjson line for scalar result, got %d", len(lines))
+	}
+}
+
+// --- Text format ---
+
+func TestRenderResult_DoctorText_AllHealthy(t *testing.T) {
+	dr := query.DoctorResult{
+		Backend:  "http",
+		Command:  "doctor",
+		APIURL:   "http://127.0.0.1:12315/api",
+		Reachable: true,
+		Auth: query.DoctorAuth{
+			Configured: true,
+			Succeeded:  true,
+		},
+		Capabilities: query.DoctorCapabilities{
+			DBQ:             true,
+			DatascriptQuery: true,
+		},
+		Warnings: []string{},
+	}
+
+	out, err := query.RenderResult("text", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := string(out)
+	for _, want := range []string{
+		"Backend:    http",
+		"API URL:    http://127.0.0.1:12315/api",
+		"Reachable:  true",
+		"DB.q:       true",
+		"Datascript: true",
+		"Auth:       configured, succeeded=true",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("text output missing %q\ngot:\n%s", want, text)
+		}
+	}
+
+	// Should NOT contain Warnings or Error lines when empty/nil.
+	if strings.Contains(text, "Warnings:") {
+		t.Errorf("should not show Warnings line when empty\ngot:\n%s", text)
+	}
+	if strings.Contains(text, "Error:") {
+		t.Errorf("should not show Error line when nil\ngot:\n%s", text)
+	}
+}
+
+func TestRenderResult_DoctorText_Unreachable(t *testing.T) {
+	dr := query.DoctorResult{
+		Backend:  "http",
+		APIURL:   "http://127.0.0.1:12315/api",
+		Warnings: []string{},
+		Error:    strPtr("transport error: connection refused"),
+	}
+
+	out, err := query.RenderResult("text", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := string(out)
+	if !strings.Contains(text, "Reachable:  false") {
+		t.Errorf("expected Reachable: false, got:\n%s", text)
+	}
+	if !strings.Contains(text, "Error:") {
+		t.Errorf("expected Error line, got:\n%s", text)
+	}
+	if !strings.Contains(text, "Auth:       not configured") {
+		t.Errorf("expected 'not configured' auth, got:\n%s", text)
+	}
+}
+
+func TestRenderResult_DoctorText_WithWarnings(t *testing.T) {
+	dr := query.DoctorResult{
+		Backend:  "http",
+		APIURL:   "http://127.0.0.1:12315/api",
+		Reachable: true,
+		Warnings: []string{"warn1", "warn2"},
+	}
+
+	out, err := query.RenderResult("text", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := string(out)
+	if !strings.Contains(text, "Warnings:   warn1; warn2") {
+		t.Errorf("expected warnings, got:\n%s", text)
+	}
+}
+
+func TestRenderResult_AdvancedText_Success(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:     "http",
+		QueryMethod: "logseq.DB.q",
+		Results:     json.RawMessage(`[["page-a"],["page-b"]]`),
+		Warnings:    []string{},
+	}
+
+	out, err := query.RenderResult("text", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := string(out)
+	// Text format pretty-prints the results.
+	if !strings.Contains(text, "page-a") {
+		t.Errorf("expected results in text, got:\n%s", text)
+	}
+	// Should not include Warnings line when empty.
+	if strings.Contains(text, "Warnings:") {
+		t.Errorf("should not show Warnings line when empty\ngot:\n%s", text)
+	}
+}
+
+func TestRenderResult_AdvancedText_Error(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:  "http",
+		Results:  json.RawMessage(`null`),
+		Warnings: []string{"fallback attempted"},
+		Error:    strPtr("both methods failed"),
+	}
+
+	out, err := query.RenderResult("text", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	text := string(out)
+	if !strings.Contains(text, "Error: both methods failed") {
+		t.Errorf("expected error line, got:\n%s", text)
+	}
+	if !strings.Contains(text, "Warnings: fallback attempted") {
+		t.Errorf("expected warnings line, got:\n%s", text)
+	}
+}
+
+// --- Unsupported format ---
+
+func TestRenderResult_UnsupportedFormat(t *testing.T) {
+	dr := query.DoctorResult{Warnings: []string{}}
+	_, err := query.RenderResult("xml", dr)
+	if err == nil {
+		t.Fatal("expected error for unsupported format")
+	}
+	if !strings.Contains(err.Error(), "unsupported format") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// --- Pointer receivers ---
+
+func TestRenderResult_PointerDoctorResult(t *testing.T) {
+	dr := &query.DoctorResult{
+		Backend:  "http",
+		Warnings: []string{},
+	}
+	out, err := query.RenderResult("json", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !json.Valid(out) {
+		t.Errorf("expected valid JSON, got: %s", out)
+	}
+}
+
+func TestRenderResult_PointerAdvancedResult(t *testing.T) {
+	ar := &query.AdvancedResult{
+		Backend:  "http",
+		Results:  json.RawMessage(`[]`),
+		Warnings: []string{},
+	}
+	out, err := query.RenderResult("json", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !json.Valid(out) {
+		t.Errorf("expected valid JSON, got: %s", out)
+	}
+}
+
+// --- Deterministic output ---
+
+func TestRenderResult_JSONKeyOrder(t *testing.T) {
+	// Verify that JSON field order matches struct declaration order
+	// (Go's json.Marshal guarantees this for structs).
+	dr := query.DoctorResult{
+		Backend:  "http",
+		Command:  "doctor",
+		APIURL:   "http://127.0.0.1:12315/api",
+		Warnings: []string{},
+	}
+
+	out, err := query.RenderResult("json", dr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	s := string(out)
+	backendIdx := strings.Index(s, `"backend"`)
+	commandIdx := strings.Index(s, `"command"`)
+	apiURLIdx := strings.Index(s, `"api_url"`)
+	warningsIdx := strings.Index(s, `"warnings"`)
+	errorIdx := strings.Index(s, `"error"`)
+
+	if backendIdx > commandIdx || commandIdx > apiURLIdx || apiURLIdx > warningsIdx || warningsIdx > errorIdx {
+		t.Errorf("JSON keys not in expected order:\n%s", s)
+	}
+}
