@@ -338,6 +338,23 @@ func TestRunQuery_AdvancedMissingQuery(t *testing.T) {
 	}
 }
 
+func TestRunQuery_AdvancedWhitespaceOnlyQuery(t *testing.T) {
+	// A --query value that is nothing but whitespace must be treated as absent,
+	// matching the trimming already applied to --file content.
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"advanced", "--query", "   \t  "},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for whitespace-only --query, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "one of --query or --file is required") {
+		t.Errorf("expected missing input error for whitespace query, got: %s", stderr.String())
+	}
+}
+
 func TestRunQuery_AdvancedBothQueryAndFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	queryPath := filepath.Join(tmpDir, "query.edn")

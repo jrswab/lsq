@@ -116,6 +116,11 @@ func runDoctor(ctx context.Context, format, apiURL, tokenEnv string, stdout, std
 
 // runAdvanced executes a raw advanced query through the HTTP API.
 func runAdvanced(ctx context.Context, format, apiURL, tokenEnv, queryStr, queryFile string, stdout, stderr io.Writer) int {
+	// Normalize both inputs: trim whitespace so a blank-only value is
+	// treated as absent, matching the file-input trimming behavior.
+	queryStr = strings.TrimSpace(queryStr)
+	queryFile = strings.TrimSpace(queryFile)
+
 	// Validate input: exactly one of --query or --file is required.
 	hasQuery := queryStr != ""
 	hasFile := queryFile != ""
