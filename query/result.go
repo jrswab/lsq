@@ -129,9 +129,9 @@ func renderJSON(result any) ([]byte, error) {
 		if v == nil {
 			return []byte("null\n"), nil
 		}
-		copy := *v
-		copy.Warnings = normalizeWarnings(copy.Warnings)
-		return marshalLine(copy)
+		resultCopy := *v
+		resultCopy.Warnings = normalizeWarnings(resultCopy.Warnings)
+		return marshalLine(resultCopy)
 	case AdvancedResult:
 		v.Warnings = normalizeWarnings(v.Warnings)
 		return marshalLine(v)
@@ -139,9 +139,9 @@ func renderJSON(result any) ([]byte, error) {
 		if v == nil {
 			return []byte("null\n"), nil
 		}
-		copy := *v
-		copy.Warnings = normalizeWarnings(copy.Warnings)
-		return marshalLine(copy)
+		resultCopy := *v
+		resultCopy.Warnings = normalizeWarnings(resultCopy.Warnings)
+		return marshalLine(resultCopy)
 	}
 	return marshalLine(result)
 }

@@ -273,7 +273,7 @@ func validateHTTPBackend(backend string) error {
 func normalizeSimpleExpr(expr string) (string, error) {
 	// If it doesn't look like a macro at all, return as-is for Phase 2 compatibility.
 	if !strings.HasPrefix(expr, "{{") {
-		return expr, nil
+		return expr, validateExcludedSimpleInput(expr, false)
 	}
 
 	matches := simpleMacroWrapperPattern.FindStringSubmatch(expr)
@@ -283,15 +283,8 @@ func normalizeSimpleExpr(expr string) (string, error) {
 
 	inner := strings.TrimSpace(matches[1])
 
-	// Explicitly reject shapes that indicate advanced queries or render-layer config.
-	if strings.Contains(strings.ToUpper(inner), "BEGIN_QUERY") {
-		return "", fmt.Errorf("unsupported macro syntax: cannot contain BEGIN_QUERY blocks")
-	}
-	if strings.Contains(inner, "{") || strings.Contains(inner, "}") {
-		return "", fmt.Errorf("unsupported macro syntax: simple macros cannot contain maps or advanced configuration")
-	}
-	if strings.Contains(strings.ToLower(inner), "[:find") {
-		return "", fmt.Errorf("unsupported macro syntax: simple macros cannot contain Datalog")
+	if err := validateExcludedSimpleInput(inner, true); err != nil {
+		return "", err
 	}
 	if !isAcceptedSimpleMacroInner(inner) {
 		return "", fmt.Errorf("unsupported macro syntax: wrapped content is not in the supported simple DSL subset")
@@ -307,4 +300,21 @@ func isAcceptedSimpleMacroInner(inner string) bool {
 		}
 	}
 	return false
+}
+
+func validateExcludedSimpleInput(expr string, wrapped bool) error {
+	prefix := "simple queries"
+	if wrapped {
+		prefix = "simple macros"
+	}
+	if strings.Contains(strings.ToUpper(expr), "BEGIN_QUERY") {
+		return fmt.Errorf("unsupported macro syntax: %s cannot contain BEGIN_QUERY blocks", prefix)
+	}
+	if strings.Contains(expr, "{") || strings.Contains(expr, "}") {
+		return fmt.Errorf("unsupported macro syntax: %s cannot contain maps or advanced configuration", prefix)
+	}
+	if strings.Contains(strings.ToLower(expr), "[:find") {
+		return fmt.Errorf("unsupported macro syntax: %s cannot contain Datalog", prefix)
+	}
+	return nil
 }

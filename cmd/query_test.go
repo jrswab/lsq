@@ -782,6 +782,22 @@ func TestRunQuery_SimpleMacroRejected_Maps(t *testing.T) {
 	}
 }
 
+// TestRunQuery_SimpleRawRejected_Maps rejects raw EDN map payloads.
+func TestRunQuery_SimpleRawRejected_Maps(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "{:query [:find ?b]}"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for raw map input, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "cannot contain maps") {
+		t.Errorf("expected map rejection error, got: %s", stderr.String())
+	}
+}
+
 // TestRunQuery_SimpleMacroRejected_Datalog rejects wrapped Datalog inputs.
 func TestRunQuery_SimpleMacroRejected_Datalog(t *testing.T) {
 	var stdout, stderr bytes.Buffer
