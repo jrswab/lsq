@@ -81,9 +81,17 @@ func TestDoRaw_BaseURLIsFullEndpoint(t *testing.T) {
 	defer srv.Close()
 
 	c := httpapi.NewClient(apiURL(srv), "", nil)
-	_, _ = c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
+	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
+	if err != nil {
+		t.Fatalf("DoRaw returned unexpected error: %v", err)
+	}
 
-	gotPath := <-gotPathCh
+	var gotPath string
+	select {
+	case gotPath = <-gotPathCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for request path")
+	}
 	if gotPath != "/api" {
 		t.Errorf("expected request path /api, got %q (double-append bug?)", gotPath)
 	}
@@ -121,8 +129,16 @@ func TestDoRaw_NoAuthHeaderWhenTokenEmpty(t *testing.T) {
 	defer srv.Close()
 
 	c := httpapi.NewClient(apiURL(srv), "", nil)
-	_, _ = c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
-	gotAuth := <-gotAuthCh
+	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
+	if err != nil {
+		t.Fatalf("DoRaw returned unexpected error: %v", err)
+	}
+	var gotAuth string
+	select {
+	case gotAuth = <-gotAuthCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for auth header")
+	}
 	if gotAuth != "" {
 		t.Errorf("expected no Authorization header, got %q", gotAuth)
 	}

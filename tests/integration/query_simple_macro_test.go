@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // TestQuerySimpleCLI_MacroStrippingIntegration verifies wrapped simple macros
@@ -47,7 +48,12 @@ func TestQuerySimpleCLI_MacroStrippingIntegration(t *testing.T) {
 	if res.ExitCode != 0 {
 		t.Fatalf("exit code %d; stderr: %q stdout: %q", res.ExitCode, res.Stderr, res.Stdout)
 	}
-	receivedArg := <-receivedArgCh
+	var receivedArg string
+	select {
+	case receivedArg = <-receivedArgCh:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for stripped macro argument")
+	}
 	if receivedArg != "[[logseq]]" {
 		t.Fatalf("expected stripped macro [[logseq]], got %q", receivedArg)
 	}
