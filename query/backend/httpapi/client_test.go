@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -37,6 +38,20 @@ type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (fn roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return fn(req)
+}
+
+func refusedAPIURL(t *testing.T) string {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+	return "http://" + addr + "/api"
 }
 
 // --- Client.DoRaw tests ---
@@ -251,8 +266,7 @@ func TestDoRaw_ServerError500(t *testing.T) {
 
 // TestDoRaw_Unreachable wraps network failures as TransportError.
 func TestDoRaw_Unreachable(t *testing.T) {
-	// Use a port that is extremely unlikely to be listening.
-	c := httpapi.NewClient("http://127.0.0.1:1/api", "", &http.Client{Timeout: 500 * time.Millisecond})
+	c := httpapi.NewClient(refusedAPIURL(t), "", &http.Client{Timeout: 500 * time.Millisecond})
 	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 	if err == nil {
 		t.Fatal("expected connection error, got nil")
@@ -767,7 +781,7 @@ func TestRunDoctor_BothMethodsReturnErrorEnvelope200(t *testing.T) {
 
 // TestRunDoctor_Unreachable reports transport failures as unreachable.
 func TestRunDoctor_Unreachable(t *testing.T) {
-	c := httpapi.NewClient("http://127.0.0.1:1/api", "", &http.Client{Timeout: 500 * time.Millisecond})
+	c := httpapi.NewClient(refusedAPIURL(t), "", &http.Client{Timeout: 500 * time.Millisecond})
 	res := httpapi.RunDoctor(context.Background(), c)
 
 	if res.Reachable {

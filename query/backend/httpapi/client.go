@@ -102,7 +102,7 @@ func (c *Client) DoRaw(ctx context.Context, method string, args []any) (json.Raw
 // not look like a Logseq error envelope (see isProbeSuccess). This prevents
 // false positives when the server returns 200 + {"error": "..."}.
 func (c *Client) ProbeDBQ(ctx context.Context) error {
-	raw, err := c.DoRaw(ctx, "logseq.DB.q", []any{"[:find ?e . :where [?e :block/uuid]]"})
+	raw, err := c.DoRaw(ctx, "logseq.DB.q", []any{"[[logseq]]"})
 	if err != nil {
 		return err
 	}
@@ -255,24 +255,30 @@ func (e *MethodError) Error() string {
 // When validating against a real Logseq instance, verify:
 //
 // TODO(real-api): 1. What HTTP status does Logseq return for an unsupported
-//   method name? (e.g. "logseq.DB.nonexistent") — expected: 200 + error
-//   envelope, or non-200?
+//
+//	method name? (e.g. "logseq.DB.nonexistent") — expected: 200 + error
+//	envelope, or non-200?
 //
 // TODO(real-api): 2. What is the exact JSON shape of a successful DB.q
-//   response? Is it always an array, or can it be a scalar/object?
+//
+//	response? Is it always an array, or can it be a scalar/object?
 //
 // TODO(real-api): 3. What is the exact JSON shape of a DB.q error response?
-//   Is it {"error":"string"}, {"error":{"message":"..."}}, or something
-//   else?
+//
+//	Is it {"error":"string"}, {"error":{"message":"..."}}, or something
+//	else?
 //
 // TODO(real-api): 4. Does logseq.DB.datascriptQuery use the same
-//   request/response envelope as logseq.DB.q?
+//
+//	request/response envelope as logseq.DB.q?
 //
 // TODO(real-api): 5. Does the Logseq API require auth by default, or only
-//   when explicitly enabled? What status code is returned on auth failure?
+//
+//	when explicitly enabled? What status code is returned on auth failure?
 //
 // TODO(real-api): 6. Is the probe query [:find ?e . :where [?e :block/uuid]]
-//   safe and fast on large graphs? Should we use a different probe query?
+//
+//	safe and fast on large graphs? Should we use a different probe query?
 func ValidateAgainstReal() {
 	// Intentional no-op. This function exists as a documentation seam.
 	// After real-instance testing, the TODOs above should be resolved and

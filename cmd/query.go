@@ -136,7 +136,9 @@ func runDoctor(ctx context.Context, format, backend, apiURL, tokenEnv string, st
 		return 1
 	}
 
-	stdout.Write(out)
+	if err := writeOutput(stdout, stderr, out); err != nil {
+		return 1
+	}
 
 	// Exit non-zero if the doctor found an error
 	// (API unreachable, auth failed, both methods failed, etc.)
@@ -201,7 +203,9 @@ func runAdvanced(ctx context.Context, format, backend, apiURL, tokenEnv, querySt
 		return 1
 	}
 
-	stdout.Write(out)
+	if err := writeOutput(stdout, stderr, out); err != nil {
+		return 1
+	}
 
 	if result.Error != nil {
 		return 1
@@ -250,7 +254,9 @@ func runSimple(ctx context.Context, format, backend, apiURL, tokenEnv, expr stri
 		return 1
 	}
 
-	stdout.Write(out)
+	if err := writeOutput(stdout, stderr, out); err != nil {
+		return 1
+	}
 
 	if result.Error != nil {
 		return 1
@@ -265,6 +271,14 @@ func validateHTTPBackend(backend string) error {
 	default:
 		return fmt.Errorf("unsupported backend %q: must be one of auto, http", backend)
 	}
+}
+
+func writeOutput(stdout, stderr io.Writer, out []byte) error {
+	if _, err := stdout.Write(out); err != nil {
+		fmt.Fprintf(stderr, "write error: %v\n", err)
+		return err
+	}
+	return nil
 }
 
 // normalizeSimpleExpr provides Phase 3 macro stripping.

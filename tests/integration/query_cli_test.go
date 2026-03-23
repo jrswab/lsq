@@ -3,6 +3,7 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,6 +34,20 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	_ = os.Remove(bin)
 	os.Exit(code)
+}
+
+func refusedAPIURL(t *testing.T) string {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatalf("close listener: %v", err)
+	}
+	return "http://" + addr + "/api"
 }
 
 // --- query doctor integration tests ---
@@ -95,11 +110,10 @@ func TestQueryCLI_DoctorJSON_Healthy(t *testing.T) {
 
 // TestQueryCLI_DoctorJSON_Unreachable reports transport failures in JSON output.
 func TestQueryCLI_DoctorJSON_Unreachable(t *testing.T) {
-	// Port 1 is always refused on loopback.
 	res := RunCLI(lsqBinary, []string{
 		"query", "doctor",
 		"--format", "json",
-		"--api-url", "http://127.0.0.1:1/api",
+		"--api-url", refusedAPIURL(t),
 	})
 
 	if res.ExitCode != 1 {
