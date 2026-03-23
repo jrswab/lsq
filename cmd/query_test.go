@@ -161,7 +161,7 @@ func TestRunQuery_DoctorRejectsAdvancedFlags(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected exit code 1, got %d", code)
 	}
-	if !strings.Contains(stderr.String(), "--query") {
+	if !strings.Contains(stderr.String(), "flag provided but not defined: -query") {
 		t.Errorf("expected invalid flag error, got: %s", stderr.String())
 	}
 }
