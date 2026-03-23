@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -71,6 +72,9 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	_ = fs.Bool("explain", false, "Show verbose diagnostic output (reserved)")
 
 	if err := fs.Parse(flagArgs); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		// flag.ContinueOnError: Parse already printed the error to stderr.
 		return 1
 	}
@@ -313,7 +317,7 @@ func normalizeSimpleExpr(expr string) (string, error) {
 	if strings.Contains(inner, "{") || strings.Contains(inner, "}") {
 		return "", fmt.Errorf("unsupported macro syntax: simple macros cannot contain maps or advanced configuration")
 	}
-	if strings.Contains(inner, "[:find") {
+	if strings.Contains(strings.ToLower(inner), "[:find") {
 		return "", fmt.Errorf("unsupported macro syntax: simple macros cannot contain Datalog")
 	}
 	if !isAcceptedSimpleMacroInner(inner) {

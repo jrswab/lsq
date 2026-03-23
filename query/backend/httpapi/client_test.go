@@ -72,9 +72,9 @@ func TestDoRaw_BaseURLIsFullEndpoint(t *testing.T) {
 	// Verify DoRaw posts directly to BaseURL without appending "/api".
 	// We set BaseURL to srv.URL+"/api" and expect the request at /api.
 	// If DoRaw appended "/api" again, the path would be /api/api.
-	var gotPath string
+	gotPathCh := make(chan string, 1)
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
+		gotPathCh <- r.URL.Path
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `"ok"`)
 	})
@@ -83,6 +83,7 @@ func TestDoRaw_BaseURLIsFullEndpoint(t *testing.T) {
 	c := httpapi.NewClient(apiURL(srv), "", nil)
 	_, _ = c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
 
+	gotPath := <-gotPathCh
 	if gotPath != "/api" {
 		t.Errorf("expected request path /api, got %q (double-append bug?)", gotPath)
 	}
@@ -90,9 +91,9 @@ func TestDoRaw_BaseURLIsFullEndpoint(t *testing.T) {
 
 // TestDoRaw_BearerAuth attaches a bearer token when configured.
 func TestDoRaw_BearerAuth(t *testing.T) {
-	var gotAuth string
+	gotAuthCh := make(chan string, 1)
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		gotAuth = r.Header.Get("Authorization")
+		gotAuthCh <- r.Header.Get("Authorization")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `"ok"`)
 	})
@@ -103,6 +104,7 @@ func TestDoRaw_BearerAuth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	gotAuth := <-gotAuthCh
 	if gotAuth != "Bearer test-token-123" {
 		t.Errorf("expected 'Bearer test-token-123', got %q", gotAuth)
 	}
@@ -110,9 +112,9 @@ func TestDoRaw_BearerAuth(t *testing.T) {
 
 // TestDoRaw_NoAuthHeaderWhenTokenEmpty omits auth when no token is configured.
 func TestDoRaw_NoAuthHeaderWhenTokenEmpty(t *testing.T) {
-	var gotAuth string
+	gotAuthCh := make(chan string, 1)
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
-		gotAuth = r.Header.Get("Authorization")
+		gotAuthCh <- r.Header.Get("Authorization")
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `"ok"`)
 	})
@@ -120,6 +122,7 @@ func TestDoRaw_NoAuthHeaderWhenTokenEmpty(t *testing.T) {
 
 	c := httpapi.NewClient(apiURL(srv), "", nil)
 	_, _ = c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
+	gotAuth := <-gotAuthCh
 	if gotAuth != "" {
 		t.Errorf("expected no Authorization header, got %q", gotAuth)
 	}
@@ -857,14 +860,14 @@ func TestRunSimpleQuery_Success(t *testing.T) {
 func TestRunSimpleQuery_DispatchesToDBQ(t *testing.T) {
 	// Verify simple queries are dispatched exclusively to logseq.DB.q,
 	// never to logseq.DB.datascriptQuery.
-	var gotMethod string
+	gotMethodCh := make(chan string, 1)
 	srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 		var req apiReq
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		gotMethod = req.Method
+		gotMethodCh <- req.Method
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, `[]`)
 	})
@@ -873,6 +876,7 @@ func TestRunSimpleQuery_DispatchesToDBQ(t *testing.T) {
 	c := httpapi.NewClient(apiURL(srv), "", nil)
 	_ = httpapi.RunSimpleQuery(context.Background(), c, "(task now)")
 
+	gotMethod := <-gotMethodCh
 	if gotMethod != "logseq.DB.q" {
 		t.Errorf("expected method logseq.DB.q, got %q", gotMethod)
 	}
@@ -1003,14 +1007,14 @@ func TestRunSimpleQuery_ExpressionShapes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var gotArgs []any
+			gotArgsCh := make(chan []any, 1)
 			srv := newTestServer(func(w http.ResponseWriter, r *http.Request) {
 				var req apiReq
 				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				gotArgs = req.Args
+				gotArgsCh <- req.Args
 				w.WriteHeader(http.StatusOK)
 				fmt.Fprint(w, `[]`)
 			})
@@ -1022,6 +1026,7 @@ func TestRunSimpleQuery_ExpressionShapes(t *testing.T) {
 			if res.Error != nil {
 				t.Fatalf("unexpected error: %q", *res.Error)
 			}
+			gotArgs := <-gotArgsCh
 			if len(gotArgs) != 1 {
 				t.Fatalf("expected 1 arg, got %d: %v", len(gotArgs), gotArgs)
 			}

@@ -10,7 +10,7 @@ import (
 // TestQuerySimpleCLI_MacroStrippingIntegration verifies wrapped simple macros
 // are stripped before the HTTP request is sent.
 func TestQuerySimpleCLI_MacroStrippingIntegration(t *testing.T) {
-	var receivedArg string
+	receivedArgCh := make(chan string, 1)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Args []any `json:"args"`
@@ -27,7 +27,7 @@ func TestQuerySimpleCLI_MacroStrippingIntegration(t *testing.T) {
 				http.Error(w, "bad request", http.StatusBadRequest)
 				return
 			}
-			receivedArg = arg
+			receivedArgCh <- arg
 		}
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`[{"block/name":"logseq"}]`)); err != nil {
@@ -47,6 +47,7 @@ func TestQuerySimpleCLI_MacroStrippingIntegration(t *testing.T) {
 	if res.ExitCode != 0 {
 		t.Fatalf("exit code %d; stderr: %q stdout: %q", res.ExitCode, res.Stderr, res.Stdout)
 	}
+	receivedArg := <-receivedArgCh
 	if receivedArg != "[[logseq]]" {
 		t.Fatalf("expected stripped macro [[logseq]], got %q", receivedArg)
 	}
