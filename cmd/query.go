@@ -304,17 +304,19 @@ func isAcceptedSimpleMacroInner(inner string) bool {
 
 func validateExcludedSimpleInput(expr string, wrapped bool) error {
 	prefix := "simple queries"
+	errorPrefix := "unsupported simple query syntax"
 	if wrapped {
 		prefix = "simple macros"
+		errorPrefix = "unsupported macro syntax"
 	}
 	if strings.Contains(strings.ToUpper(expr), "BEGIN_QUERY") {
-		return fmt.Errorf("unsupported macro syntax: %s cannot contain BEGIN_QUERY blocks", prefix)
+		return fmt.Errorf("%s: %s cannot contain BEGIN_QUERY blocks", errorPrefix, prefix)
 	}
 	if strings.Contains(expr, "{") || strings.Contains(expr, "}") {
-		return fmt.Errorf("unsupported macro syntax: %s cannot contain maps or advanced configuration", prefix)
+		return fmt.Errorf("%s: %s cannot contain maps or advanced configuration", errorPrefix, prefix)
 	}
 	if strings.Contains(strings.ToLower(expr), "[:find") {
-		return fmt.Errorf("unsupported macro syntax: %s cannot contain Datalog", prefix)
+		return fmt.Errorf("%s: %s cannot contain Datalog", errorPrefix, prefix)
 	}
 	return nil
 }

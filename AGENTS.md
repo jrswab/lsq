@@ -10,17 +10,16 @@ This file governs `./` and its descendants unless a deeper `AGENTS.md` overrides
 
 ## Inherits
 
-- `../../AGENTS.md`
-- `../AGENTS.md`
+None.
 
 ## Source Of Truth
 
-Current query work is governed by:
+For upstream-facing work in this repository:
 
-- Spec: `./docs/superpowers/specs/2026-03-22-logseq-query-design.md`
-- Plan: `./docs/superpowers/plans/2026-03-22-logseq-query-phase-1.md`
+- shipped behavior is defined by the code, tests, `README.md`, and `CHANGELOG.md`
+- internal planning docs may exist out of tree and should not be referenced here unless they are committed into this repository
 
-These documents are authoritative for current query expansion work. `AGENTS.md` should not restate their implementation detail.
+`AGENTS.md` should not restate implementation detail that already lives in code, tests, or user-facing docs.
 
 ## Rules
 
@@ -40,8 +39,8 @@ These documents are authoritative for current query expansion work. `AGENTS.md` 
 
 ## Documentation
 
-- Feature-level decisions belong in `docs/superpowers/specs/` and `docs/superpowers/plans/`.
 - Repo-wide usage belongs in `README.md`.
+- Changelog entries belong in `CHANGELOG.md`.
 - This file only defines working constraints for contributors and agents.
 
 ## Deeper AGENTS
@@ -51,7 +50,6 @@ Do not add deeper `AGENTS.md` files inside this repo unless a subdirectory becom
 Likely future candidates, only if justified:
 
 - `query/`
-- `docs/superpowers/`
 
 ## Overrides
 

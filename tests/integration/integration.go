@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -102,7 +103,11 @@ func (h *TestHelper) AssertFileExists(path string, expectedContent string) {
 // path to the compiled executable. It is safe to call from TestMain.
 // The caller is responsible for removing the returned file when done.
 func BuildBinary(moduleRoot string) (string, error) {
-	tmpFile, err := os.CreateTemp("", "lsq_integration_test_*")
+	pattern := "lsq_integration_test_*"
+	if runtime.GOOS == "windows" {
+		pattern += ".exe"
+	}
+	tmpFile, err := os.CreateTemp("", pattern)
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file for build output: %w", err)
 	}

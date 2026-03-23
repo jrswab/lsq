@@ -15,8 +15,7 @@ import (
 // TestQueryCLI_* tests in this package. It is set once by TestMain.
 var lsqBinary string
 
-// TestMain builds the lsq binary once for the package, then runs the tests.
-// TestMain builds the lsq test binary once for integration tests.
+// TestMain builds the lsq binary once for all integration tests, then runs them.
 func TestMain(m *testing.M) {
 	// Locate the module root (two levels up from tests/integration/).
 	moduleRoot, err := filepath.Abs(filepath.Join("..", ".."))
