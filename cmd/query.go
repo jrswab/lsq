@@ -47,6 +47,13 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "usage: lsq query <doctor|advanced|simple> [flags]")
 		return 1
 	}
+	if args[0] == "-h" || args[0] == "--help" {
+		fmt.Fprintln(stdout, "usage: lsq query <doctor|advanced|simple> [flags]")
+		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, "Run Logseq queries from the command line.")
+		fmt.Fprintln(stdout, "Use a specific query subcommand for more details.")
+		return 0
+	}
 
 	subcommand := args[0]
 	flagArgs := args[1:]

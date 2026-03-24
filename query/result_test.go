@@ -718,6 +718,22 @@ func TestRenderResult_UnsupportedTypeNDJSON(t *testing.T) {
 	}
 }
 
+func TestRenderResult_AdvancedText_InvalidJSONFallsBackToRaw(t *testing.T) {
+	ar := query.AdvancedResult{
+		Backend:  "http",
+		Results:  json.RawMessage(`{"broken"`),
+		Warnings: []string{},
+	}
+
+	out, err := query.RenderResult("text", ar)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(out) != "{\"broken\"\n" {
+		t.Fatalf("expected raw payload fallback, got: %q", string(out))
+	}
+}
+
 // --- Pointer receivers ---
 
 func TestRenderResult_PointerDoctorResult(t *testing.T) {

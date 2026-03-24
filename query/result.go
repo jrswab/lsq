@@ -310,6 +310,9 @@ func advancedText(r AdvancedResult) []byte {
 				sb.Write(r.Results)
 				sb.WriteByte('\n')
 			}
+		} else {
+			sb.Write(r.Results)
+			sb.WriteByte('\n')
 		}
 	}
 

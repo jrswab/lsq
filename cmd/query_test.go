@@ -196,6 +196,22 @@ func TestRunQuery_NoSubcommand(t *testing.T) {
 	}
 }
 
+// TestRunQuery_Help reports generic query help for `lsq query -h`.
+func TestRunQuery_Help(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery([]string{"-h"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected empty stderr, got: %s", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "usage: lsq query <doctor|advanced|simple> [flags]") {
+		t.Fatalf("expected query help in stdout, got: %s", stdout.String())
+	}
+}
+
 // TestRunQuery_UnknownSubcommand rejects unknown query subcommands.
 func TestRunQuery_UnknownSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
