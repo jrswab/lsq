@@ -67,7 +67,14 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	fs := flag.NewFlagSet("lsq query "+subcommand, flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	fs.SetOutput(io.Discard)
+	fs.Usage = func() {
+		fmt.Fprintf(stdout, "usage: lsq query %s [flags]\n", subcommand)
+		prev := fs.Output()
+		fs.SetOutput(stdout)
+		fs.PrintDefaults()
+		fs.SetOutput(prev)
+	}
 
 	backend := fs.String("backend", "auto", "Execution backend: auto, http")
 	format := fs.String("format", "text", "Output format: text, json, ndjson")
@@ -87,9 +94,10 @@ func RunQuery(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if err := fs.Parse(flagArgs); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
+			fs.Usage()
 			return 0
 		}
-		// flag.ContinueOnError: Parse already printed the error to stderr.
+		fmt.Fprintln(stderr, err)
 		return 1
 	}
 	if extras := fs.Args(); len(extras) > 0 {

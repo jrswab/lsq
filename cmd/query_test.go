@@ -212,6 +212,24 @@ func TestRunQuery_Help(t *testing.T) {
 	}
 }
 
+func TestRunQuery_DoctorHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery([]string{"doctor", "-h"}, &stdout, &stderr)
+
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected empty stderr, got: %s", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "usage: lsq query doctor [flags]") {
+		t.Fatalf("expected doctor help in stdout, got: %s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "-backend") {
+		t.Fatalf("expected flags in doctor help, got: %s", stdout.String())
+	}
+}
+
 // TestRunQuery_UnknownSubcommand rejects unknown query subcommands.
 func TestRunQuery_UnknownSubcommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer

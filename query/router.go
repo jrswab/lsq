@@ -25,6 +25,6 @@ func RunSimple(ctx context.Context, backend string, expr string, execHTTP HTTPSi
 		// Dispatch to the correct backend function (provided as a closure, e.g., httpapi.RunSimpleQuery)
 		return execHTTP(ctx, expr), nil
 	default:
-		return AdvancedResult{}, fmt.Errorf("unsupported backend %q for simple query", backend)
+		return AdvancedResult{}, fmt.Errorf("unsupported backend %q for simple query: must be one of auto, http", backend)
 	}
 }

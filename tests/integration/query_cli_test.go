@@ -32,7 +32,9 @@ func TestMain(m *testing.M) {
 	}
 	lsqBinary = bin
 	code := m.Run()
-	_ = os.Remove(bin)
+	if err := os.Remove(bin); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to remove temporary binary %q: %v\n", bin, err)
+	}
 	os.Exit(code)
 }
 
