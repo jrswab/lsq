@@ -658,6 +658,49 @@ func TestRunDoctor_DBQFailedDatascriptWorks(t *testing.T) {
 	}
 }
 
+func TestRunDoctor_DBQTransportButDatascriptSucceeds_IsInconsistentProbe(t *testing.T) {
+	transportClient := &http.Client{
+		Transport: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			var payload apiReq
+			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+				return nil, err
+			}
+			if payload.Method == "logseq.DB.q" {
+				return nil, fmt.Errorf("dial tcp 127.0.0.1:12315: connect: connection reset by peer")
+			}
+
+			body := io.NopCloser(strings.NewReader(`42`))
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       body,
+			}, nil
+		}),
+	}
+
+	c := httpapi.NewClient("http://127.0.0.1:12315/api", "tok", transportClient)
+	res := httpapi.RunDoctor(context.Background(), c)
+
+	if !res.Reachable {
+		t.Error("expected reachable=true")
+	}
+	if res.Capabilities.DBQ {
+		t.Error("expected capabilities.db_q=false")
+	}
+	if res.Capabilities.DatascriptQuery {
+		t.Error("expected capabilities.datascript_query=false for inconsistent probe")
+	}
+	if res.Error == nil {
+		t.Fatal("expected error to be set")
+	}
+	if !strings.Contains(*res.Error, "inconsistent probe results") {
+		t.Fatalf("expected inconsistent probe error, got %q", *res.Error)
+	}
+	if len(res.Warnings) == 0 {
+		t.Fatal("expected warning to be set")
+	}
+}
+
 // TestRunDoctor_BothMethodsFail_ReachableTrue preserves reachable=true on method failures.
 func TestRunDoctor_BothMethodsFail_ReachableTrue(t *testing.T) {
 	// FIX VERIFICATION: Both methods return 500 (method-layer error).
@@ -865,6 +908,9 @@ func TestRunAdvancedQuery_Failure(t *testing.T) {
 	if res.Error == nil {
 		t.Fatal("expected error on failure")
 	}
+	if res.QueryMethod != "logseq.DB.datascriptQuery" {
+		t.Errorf("expected query_method=logseq.DB.datascriptQuery, got %q", res.QueryMethod)
+	}
 	if string(res.Results) != "null" {
 		t.Errorf("expected null results, got %s", res.Results)
 	}
@@ -993,8 +1039,8 @@ func TestRunSimpleQuery_NullResponseIsError(t *testing.T) {
 	if !strings.Contains(*res.Error, "returned null") {
 		t.Errorf("expected error containing 'returned null', got %q", *res.Error)
 	}
-	if res.QueryMethod != "" {
-		t.Errorf("expected empty query_method on null response, got %q", res.QueryMethod)
+	if res.QueryMethod != "logseq.DB.q" {
+		t.Errorf("expected query_method=logseq.DB.q on null response, got %q", res.QueryMethod)
 	}
 	if string(res.Results) != "null" {
 		t.Errorf("expected null results on null response, got %s", res.Results)

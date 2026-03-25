@@ -338,6 +338,10 @@ func validateExcludedSimpleInput(expr string, wrapped bool) error {
 		prefix = "simple macros"
 		errorPrefix = "unsupported macro syntax"
 	}
+	trimmed := strings.TrimSpace(expr)
+	if strings.HasPrefix(trimmed, "[") && !strings.HasPrefix(trimmed, "[[") {
+		return fmt.Errorf("%s: %s cannot contain advanced EDN vectors or Datalog", errorPrefix, prefix)
+	}
 	if strings.Contains(strings.ToUpper(expr), "BEGIN_QUERY") {
 		return fmt.Errorf("%s: %s cannot contain BEGIN_QUERY blocks", errorPrefix, prefix)
 	}

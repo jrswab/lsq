@@ -832,6 +832,21 @@ func TestRunQuery_SimpleRawRejected_Maps(t *testing.T) {
 	}
 }
 
+func TestRunQuery_SimpleRawRejected_Vectors(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := cmd.RunQuery(
+		[]string{"simple", "--expr", "[:find ?b]"},
+		&stdout, &stderr,
+	)
+
+	if code != 1 {
+		t.Fatalf("expected exit code 1 for raw vector input, got %d", code)
+	}
+	if !strings.Contains(stderr.String(), "cannot contain advanced EDN vectors or Datalog") {
+		t.Errorf("expected vector rejection error, got: %s", stderr.String())
+	}
+}
+
 // TestRunQuery_SimpleMacroRejected_Datalog rejects wrapped Datalog inputs.
 func TestRunQuery_SimpleMacroRejected_Datalog(t *testing.T) {
 	var stdout, stderr bytes.Buffer
@@ -843,7 +858,7 @@ func TestRunQuery_SimpleMacroRejected_Datalog(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("expected exit code 1 for datalog input, got %d", code)
 	}
-	if !strings.Contains(stderr.String(), "cannot contain Datalog") {
+	if !strings.Contains(stderr.String(), "cannot contain advanced EDN vectors or Datalog") {
 		t.Errorf("expected datalog rejection error, got: %s", stderr.String())
 	}
 }

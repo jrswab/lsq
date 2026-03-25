@@ -56,11 +56,14 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 				res.Error = &msg
 				return res
 			}
-			// datascriptQuery succeeded → API reachable, DB.q is not.
+			// datascriptQuery succeeded after DB.q hit a transport failure.
+			// This is inconsistent probe behavior: the API is reachable, but we
+			// cannot confidently diagnose DB.q as unavailable.
 			res.Reachable = true
 			setAuthSucceeded(&res)
-			res.Capabilities.DatascriptQuery = true
-			res.Warnings = append(res.Warnings, "logseq.DB.q is not available; logseq.DB.datascriptQuery is available as fallback")
+			res.Warnings = append(res.Warnings, "inconsistent probe results: logseq.DB.q failed at transport level while logseq.DB.datascriptQuery succeeded")
+			msg := fmt.Sprintf("inconsistent probe results: logseq.DB.q: %s; logseq.DB.datascriptQuery succeeded", dbqErr)
+			res.Error = &msg
 			return res
 		}
 
@@ -113,14 +116,14 @@ func RunDoctor(ctx context.Context, c *Client) query.DoctorResult {
 // It routes queries directly to logseq.DB.datascriptQuery.
 func RunAdvancedQuery(ctx context.Context, c *Client, queryStr string) query.AdvancedResult {
 	res := query.AdvancedResult{
-		Backend:   "http",
-		InputKind: "advanced",
-		Warnings:  []string{},
+		Backend:     "http",
+		InputKind:   "advanced",
+		QueryMethod: "logseq.DB.datascriptQuery",
+		Warnings:    []string{},
 	}
 
 	raw, err := c.DoRaw(ctx, "logseq.DB.datascriptQuery", []any{queryStr})
 	if err == nil {
-		res.QueryMethod = "logseq.DB.datascriptQuery"
 		res.Results = raw
 		return res
 	}
@@ -145,9 +148,10 @@ func RunAdvancedQuery(ctx context.Context, c *Client, queryStr string) query.Adv
 // QueryMethod="logseq.DB.q" so existing rendering works unchanged.
 func RunSimpleQuery(ctx context.Context, c *Client, expr string) query.AdvancedResult {
 	res := query.AdvancedResult{
-		Backend:   "http",
-		InputKind: "simple",
-		Warnings:  []string{},
+		Backend:     "http",
+		InputKind:   "simple",
+		QueryMethod: "logseq.DB.q",
+		Warnings:    []string{},
 	}
 
 	raw, err := c.DoRaw(ctx, "logseq.DB.q", []any{expr})
@@ -164,7 +168,6 @@ func RunSimpleQuery(ctx context.Context, c *Client, expr string) query.AdvancedR
 			res.Results = json.RawMessage("null")
 			return res
 		}
-		res.QueryMethod = "logseq.DB.q"
 		res.Results = raw
 		return res
 	}
