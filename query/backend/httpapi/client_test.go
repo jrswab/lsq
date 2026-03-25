@@ -277,6 +277,18 @@ func TestDoRaw_Unreachable(t *testing.T) {
 	}
 }
 
+func TestDoRaw_InvalidURL(t *testing.T) {
+	c := httpapi.NewClient("://bad-url", "", &http.Client{Timeout: 500 * time.Millisecond})
+	_, err := c.DoRaw(context.Background(), "logseq.DB.q", []any{"test"})
+	if err == nil {
+		t.Fatal("expected error for invalid URL, got nil")
+	}
+	var te *httpapi.TransportError
+	if !errors.As(err, &te) {
+		t.Fatalf("expected TransportError, got %T: %v", err, err)
+	}
+}
+
 // --- Probe validation tests ---
 
 func TestProbeDBQ_ErrorEnvelope200(t *testing.T) {
@@ -789,6 +801,18 @@ func TestRunDoctor_Unreachable(t *testing.T) {
 	}
 	if res.Error == nil {
 		t.Error("expected error to be set")
+	}
+}
+
+func TestRunDoctor_InvalidURL(t *testing.T) {
+	c := httpapi.NewClient("://bad-url", "", &http.Client{Timeout: 500 * time.Millisecond})
+	res := httpapi.RunDoctor(context.Background(), c)
+
+	if res.Reachable {
+		t.Error("expected reachable=false")
+	}
+	if res.Error == nil {
+		t.Fatal("expected error to be set")
 	}
 }
 
