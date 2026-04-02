@@ -72,6 +72,7 @@ func main() {
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 	version := flag.Bool("v", false, "Display current lsq version")
 	yesterday := flag.Bool("y", false, "Open yesterday's journal page")
+	journalOverview := flag.Bool("j", false, "Print full journal overview to STDOUT via pager (newest first, skipping empty dates).")
 
 	flag.Parse()
 
@@ -226,6 +227,23 @@ func main() {
 	if err != nil {
 		log.Printf("Error setting journal path: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Print full journal overview to STDOUT via pager (newest first, skipping empty dates).
+	if *journalOverview {
+		pw, cleanup, err := system.LoadPager()
+		if err != nil {
+			log.Printf("Error loading pager: %v\n", err)
+			os.Exit(1)
+		}
+		defer cleanup()
+		if err := system.PrintJournalOverview(pw, cfg, cfg.JournalsDir); err != nil {
+			log.Printf("Error printing journal overview: %v\n", err)
+			os.Exit(1)
+		}
+		// pw must be closed before cleanup runs so the pager receives EOF
+		pw.Close()
+		return
 	}
 
 	// Print journal content to STDOUT and exit.

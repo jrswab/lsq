@@ -1,12 +1,15 @@
 package system
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -106,4 +109,139 @@ func AppendToFile(path, content string, indent int) error {
 	// Write data to the file
 	_, err = file.WriteString(bc)
 	return err
+}
+
+// isJournalEmpty checks if journal content is effectively empty
+// (only whitespace, newlines, or dash placeholders)
+func isJournalEmpty(content []byte) bool {
+	if len(content) == 0 {
+		return true
+	}
+
+	// Pattern: dash followed by optional whitespace, end of string
+	re := regexp.MustCompile(`^-\s*$`)
+
+	// Split content into lines and check each non-blank line
+	lines := bytes.Split(content, []byte{'\n'})
+	for _, line := range lines {
+		// Check if line is blank (only whitespace)
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
+		// Non-blank line must match the placeholder pattern
+		if !re.Match(line) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// PrintJournalOverview prints an overview of all non-empty journal entries
+// in reverse chronological order (newest first).
+func PrintJournalOverview(w io.Writer, cfg *config.Config, journalsDir string) error {
+	// Read the journals directory
+	entries, err := os.ReadDir(journalsDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("journals directory does not exist: %w", err)
+		}
+		return fmt.Errorf("error reading journals directory: %w", err)
+	}
+
+	// Determine expected file extension
+	extension := ".md"
+	if strings.EqualFold(cfg.FileType, "Org") {
+		extension = ".org"
+	}
+
+	// Parse date format from config
+	dateFormat := config.ConvertDateFormat(cfg.FileFmt)
+
+	// Type to hold parsed journal entries
+	type journalEntry struct {
+		date    time.Time
+		path    string
+		content string
+	}
+
+	var journals []journalEntry
+
+	// Process each entry in the directory
+	for _, entry := range entries {
+		// Skip directories
+		if entry.IsDir() {
+			continue
+		}
+
+		name := entry.Name()
+
+		// Check if file has the correct extension
+		if !strings.HasSuffix(name, extension) {
+			continue
+		}
+
+		// Remove extension to get the date string
+		dateStr := strings.TrimSuffix(name, extension)
+
+		// Parse the date in UTC to ensure consistent weekday names
+		date, err := time.ParseInLocation(dateFormat, dateStr, time.UTC)
+		if err != nil {
+			// Silently skip files that cannot be parsed as dates
+			continue
+		}
+
+		// Read file content
+		path := filepath.Join(journalsDir, name)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("error reading file %s: %w", name, err)
+		}
+
+		// Skip empty journals
+		if isJournalEmpty(content) {
+			continue
+		}
+
+		journals = append(journals, journalEntry{
+			date:    date,
+			path:    path,
+			content: string(content),
+		})
+	}
+
+	// Sort in reverse chronological order (newest first)
+	sort.Slice(journals, func(i, j int) bool {
+		return journals[i].date.After(journals[j].date)
+	})
+
+	// Write output for each journal
+	for _, journal := range journals {
+		// Write header line: date + day + 65 U+2500 chars
+		header := journal.date.Format("2006-01-02") + " " +
+			journal.date.Format("Mon") + " " +
+			strings.Repeat("─", 65) + "\n"
+		if _, err := w.Write([]byte(header)); err != nil {
+			return fmt.Errorf("error writing header: %w", err)
+		}
+
+		// Write content
+		if _, err := w.Write([]byte(journal.content)); err != nil {
+			return fmt.Errorf("error writing content: %w", err)
+		}
+
+		// Write separator: if content ends with \n, write one more \n for blank line;
+		// otherwise write \n\n to add newline after content plus blank separator
+		if strings.HasSuffix(journal.content, "\n") {
+			if _, err := w.Write([]byte("\n")); err != nil {
+				return fmt.Errorf("error writing separator: %w", err)
+			}
+		} else {
+			if _, err := w.Write([]byte("\n\n")); err != nil {
+				return fmt.Errorf("error writing separator: %w", err)
+			}
+		}
+	}
+
+	return nil
 }
