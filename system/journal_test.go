@@ -1,6 +1,7 @@
 package system_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -393,4 +394,231 @@ func TestAppendToFile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrintJournalOverview(t *testing.T) {
+	tests := []struct {
+		name        string
+		setupFiles  map[string]string // filename -> content (empty string = 0-byte file)
+		setupDirs   []string          // subdirectories to create
+		fileType    string            // "Markdown" or "Org"
+		journalsDir string            // override directory path (empty = use temp dir)
+		wantErr     bool
+		wantOutput  string
+	}{
+		{
+			name:        "directory does not exist",
+			journalsDir: "/nonexistent/path/to/journals",
+			fileType:    "Markdown",
+			setupFiles:  nil,
+			wantErr:     true,
+			wantOutput:  "",
+		},
+		{
+			name:       "empty directory",
+			setupFiles: map[string]string{},
+			fileType:   "Markdown",
+			wantErr:    false,
+			wantOutput: "",
+		},
+		{
+			name: "all files are empty",
+			setupFiles: map[string]string{
+				"2006_01_02.md": "",
+				"2006_01_03.md": "",
+			},
+			fileType:   "Markdown",
+			wantErr:    false,
+			wantOutput: "",
+		},
+		{
+			name: "single non-empty md file",
+			setupFiles: map[string]string{
+				"2006_01_02.md": "- Journal entry 1\n- Journal entry 2\n",
+			},
+			fileType: "Markdown",
+			wantErr:  false,
+			wantOutput: "2006-01-02 Mon " + strings.Repeat("─", 65) + "\n" +
+				"- Journal entry 1\n- Journal entry 2\n\n",
+		},
+		{
+			name: "multiple non-empty md files reverse chronological order",
+			setupFiles: map[string]string{
+				"2006_01_02.md": "Older journal content",
+				"2006_01_04.md": "Newest journal content",
+				"2006_01_03.md": "Middle journal content",
+			},
+			fileType: "Markdown",
+			wantErr:  false,
+			wantOutput: "2006-01-04 Wed " + strings.Repeat("─", 65) + "\n" +
+				"Newest journal content\n\n" +
+				"2006-01-03 Tue " + strings.Repeat("─", 65) + "\n" +
+				"Middle journal content\n\n" +
+				"2006-01-02 Mon " + strings.Repeat("─", 65) + "\n" +
+				"Older journal content\n\n",
+		},
+		{
+			name: "mix of empty and non-empty files",
+			setupFiles: map[string]string{
+				"2006_01_02.md": "",
+				"2006_01_03.md": "Has content",
+				"2006_01_04.md": "",
+			},
+			fileType: "Markdown",
+			wantErr:  false,
+			wantOutput: "2006-01-03 Tue " + strings.Repeat("─", 65) + "\n" +
+				"Has content\n\n",
+		},
+		{
+			name: "file name cannot be parsed as date",
+			setupFiles: map[string]string{
+				"2006_01_02.md":   "Valid date",
+				"invalid-date.md": "Invalid date content",
+			},
+			fileType: "Markdown",
+			wantErr:  false,
+			wantOutput: "2006-01-02 Mon " + strings.Repeat("─", 65) + "\n" +
+				"Valid date\n\n",
+		},
+		{
+			name: "non-journal file wrong extension",
+			setupFiles: map[string]string{
+				"2006_01_02.md":  "Valid journal",
+				"2006_01_03.txt": "Text file content",
+				"2006_01_04.org": "Org file content",
+			},
+			fileType: "Markdown",
+			wantErr:  false,
+			wantOutput: "2006-01-02 Mon " + strings.Repeat("─", 65) + "\n" +
+				"Valid journal\n\n",
+		},
+		{
+			name: "subdirectory inside journals dir",
+			setupFiles: map[string]string{
+				"2006_01_02.md": "Valid journal",
+			},
+			setupDirs: []string{"subdir"},
+			fileType:  "Markdown",
+			wantErr:   false,
+			wantOutput: "2006-01-02 Mon " + strings.Repeat("─", 65) + "\n" +
+				"Valid journal\n\n",
+		},
+		{
+			name: "file content without trailing newline",
+			setupFiles: map[string]string{
+				"2006_01_02.md": "Content without newline",
+			},
+			fileType: "Markdown",
+			wantErr:  false,
+			wantOutput: "2006-01-02 Mon " + strings.Repeat("─", 65) + "\n" +
+				"Content without newline\n\n",
+		},
+		{
+			name: "unicode content in file",
+			setupFiles: map[string]string{
+				"2006_01_02.md": "测试 Test テスト 🎉",
+			},
+			fileType: "Markdown",
+			wantErr:  false,
+			wantOutput: "2006-01-02 Mon " + strings.Repeat("─", 65) + "\n" +
+				"测试 Test テスト 🎉\n\n",
+		},
+		{
+			name: "org file type config",
+			setupFiles: map[string]string{
+				"2006_01_02.md":  "Markdown file ignored",
+				"2006_01_03.org": "Org file content",
+				"2006_01_04.md":  "Another md ignored",
+				"2006_01_05.org": "Another org content",
+			},
+			fileType: "Org",
+			wantErr:  false,
+			wantOutput: "2006-01-05 Thu " + strings.Repeat("─", 65) + "\n" +
+				"Another org content\n\n" +
+				"2006-01-03 Tue " + strings.Repeat("─", 65) + "\n" +
+				"Org file content\n\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var journalsDir string
+			if tt.journalsDir != "" {
+				journalsDir = tt.journalsDir
+			} else {
+				journalsDir = t.TempDir()
+
+				// Create subdirectories
+				for _, dir := range tt.setupDirs {
+					err := os.MkdirAll(filepath.Join(journalsDir, dir), 0755)
+					if err != nil {
+						t.Fatalf("Failed to create subdirectory: %v", err)
+					}
+				}
+
+				// Create files
+				for filename, content := range tt.setupFiles {
+					path := filepath.Join(journalsDir, filename)
+					err := os.WriteFile(path, []byte(content), 0644)
+					if err != nil {
+						t.Fatalf("Failed to write test file %s: %v", filename, err)
+					}
+				}
+			}
+
+			cfg := &config.Config{
+				FileType: tt.fileType,
+				FileFmt:  "yyyy_MM_dd",
+			}
+
+			var buf bytes.Buffer
+			err := system.PrintJournalOverview(&buf, cfg, journalsDir)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PrintJournalOverview() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if got := buf.String(); got != tt.wantOutput {
+				t.Errorf("PrintJournalOverview() output:\n%q\nwant:\n%q", got, tt.wantOutput)
+			}
+		})
+	}
+
+	// Header format assertion test - specific check for exact format
+	t.Run("header format assertion", func(t *testing.T) {
+		journalsDir := t.TempDir()
+
+		// 2006-01-02 is a Monday
+		cfg := &config.Config{
+			FileType: "Markdown",
+			FileFmt:  "yyyy_MM_dd",
+		}
+
+		err := os.WriteFile(filepath.Join(journalsDir, "2006_01_02.md"), []byte("test content"), 0644)
+		if err != nil {
+			t.Fatalf("Failed to write test file: %v", err)
+		}
+
+		var buf bytes.Buffer
+		err = system.PrintJournalOverview(&buf, cfg, journalsDir)
+		if err != nil {
+			t.Fatalf("PrintJournalOverview() error = %v", err)
+		}
+
+		// Expected header: 15 chars (date + day) + 65 U+2500 chars + newline
+		expectedHeader := "2006-01-02 Mon " + strings.Repeat("─", 65) + "\n"
+		got := buf.String()
+
+		if !strings.HasPrefix(got, expectedHeader) {
+			t.Errorf("Header format mismatch.\nGot prefix: %q\nWant:       %q", got[:min(len(got), len(expectedHeader))], expectedHeader)
+		}
+	})
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
