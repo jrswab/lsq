@@ -55,6 +55,18 @@ func searchInDirectory(directory string, pattern *regexp.Regexp) error {
 	})
 }
 
+// hasSelectorFlag reports whether any "selector" flags are explicitly set.
+// Selectors choose *which* resource to operate on, not *how* to operate.
+func hasSelectorFlag() bool {
+	selected := false
+	flag.CommandLine.Visit(func(f *flag.Flag) {
+		if f.Name == "n" || f.Name == "y" || f.Name == "s" || f.Name == "p" {
+			selected = true
+		}
+	})
+	return selected
+}
+
 func main() {
 	// File Path Override
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
@@ -91,7 +103,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *indent > 0 && *editMode {
+	// Check if -i was explicitly provided (regardless of its value)
+	iExplicitlySet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "i" {
+			iExplicitlySet = true
+		}
+	})
+	if iExplicitlySet && *editMode {
 		fmt.Fprintln(os.Stderr, "Error: -i is incompatible with edit mode (-E). Use -a with -i for indented appending.")
 		os.Exit(1)
 	}
@@ -130,8 +149,9 @@ func main() {
 		}
 	}
 
-	// When called with no flags and no content, default to edit mode (equivalent to -E)
-	if flag.NFlag() == 0 && *apnd == "" {
+	// When called with no flags and no content, or with selector flags and no content,
+	// default to edit mode (equivalent to -E).
+	if (flag.NFlag() == 0 || hasSelectorFlag()) && *apnd == "" {
 		*editMode = true
 	}
 

@@ -37,7 +37,7 @@ go install github.com/jrswab/lsq@latest
 ```bash
 lsq
 ```
-This will append a journal entry for today's date. Use `lsq -E` to open the editor.
+This will open today's journal in your default editor for editing. Use `lsq -a "text"` to append without opening an editor.
 
 ## Usage
 ### Command Line Options
@@ -46,7 +46,7 @@ This will append a journal entry for today's date. Use `lsq -E` to open the edit
 - `-c`: Print journal or page content to STDOUT instead of opening an editor.
 - `-d`: Specify main directory path. Supports `~` and environment variables. (example: `~/Documents/Notes`)
 - `-e`: Set editor to use while editing files. (Defaults to $EDITOR, then Vim if $EDITOR is not set)
-- `-E`: Open the journal or page in your editor for editing (edit mode). Use `-E` to enter edit mode instead of the default append mode.
+- `-E`: Open the journal or page in your editor for editing (edit mode). Explicitly enable edit mode; edit mode is the default when no content is provided.
 - `-f`: Search pages and aliases. Must be followed by a string.
 - `-i`: Set the indentation level (number of tabs) for appended text.
 - `-n`: Number of days ago to target for the journal entry. (example: `-n 3` targets the journal from 3 days ago)
@@ -86,7 +86,7 @@ The configuration file will override any lsq defaults which are defined. If a CL
 ```bash
 lsq
 ```
-This appends an entry to today's journal. No editor is opened—your note is captured immediately.
+This opens today's journal in your default editor for editing. Use `lsq -a "text"` to append without opening an editor.
 
 ```bash
 lsq -E

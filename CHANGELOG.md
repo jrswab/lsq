@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Changed
-- **Breaking:** Appending to the journal is now the default behavior. Running `lsq` without flags will append a journal entry instead of opening an editor.
+- **Breaking:** Append mode is now the default when content is provided (via arguments, `-a`/`-A`, or STDIN). Running `lsq` with no flags and no content opens the editor (equivalent to `-E`).
 - Added `-E` flag to enter edit mode (open the journal/page in your editor).
 - `-a` and `-A` flags no longer require explicit use to append; append mode is now the default.
 - `-i` flag no longer requires `-a` or `-A`; it is compatible with the default append mode.
