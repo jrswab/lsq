@@ -37,6 +37,7 @@ go install github.com/jrswab/lsq@latest
 ```bash
 lsq
 ```
+This will append a journal entry for today's date. Use `lsq -E` to open the editor.
 
 ## Usage
 ### Command Line Options
@@ -45,8 +46,9 @@ lsq
 - `-c`: Print journal or page content to STDOUT instead of opening an editor.
 - `-d`: Specify main directory path. Supports `~` and environment variables. (example: `~/Documents/Notes`)
 - `-e`: Set editor to use while editing files. (Defaults to $EDITOR, then Vim if $EDITOR is not set)
+- `-E`: Open the journal or page in your editor for editing (edit mode). Use `-E` to enter edit mode instead of the default append mode.
 - `-f`: Search pages and aliases. Must be followed by a string.
-- `-i`: Set the indentation level (number of tabs) for appended text. Requires `-a` or `-A`.
+- `-i`: Set the indentation level (number of tabs) for appended text.
 - `-n`: Number of days ago to target for the journal entry. (example: `-n 3` targets the journal from 3 days ago)
 - `-o`: Automatically open the first result from the search.
 - `-p`: Open a specific page from the pages directory.
@@ -84,7 +86,12 @@ The configuration file will override any lsq defaults which are defined. If a CL
 ```bash
 lsq
 ```
-This opens today's journal in your default editor ($EDITOR environment variable).
+This appends an entry to today's journal. No editor is opened—your note is captured immediately.
+
+```bash
+lsq -E
+```
+This opens today's journal in your default editor ($EDITOR environment variable) for editing.
 If no editor is defined in $EDITOR, then `Vim` will be used.
 
 ```bash
@@ -127,7 +134,8 @@ This prints the journal from 3 days ago to STDOUT.
 lsq -a "sub-item text" -i 1
 ```
 This appends text as an indented bullet (one tab level deep), creating a nested
-list item in Logseq. Use `-i 2` for two levels deep, and so on.
+list item in Logseq. Use `-i 2` for two levels deep, and so on. Note: `-i` cannot
+be used together with edit mode (`-E`).
 
 ## Contributing
 For information on contributing to lsq check out [CONTRIBUTING.md](https://github.com/jrswab/lsq/blob/master/CONTRIBUTING.md).
