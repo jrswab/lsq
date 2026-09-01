@@ -17,7 +17,7 @@ import (
 	"github.com/jrswab/lsq/trie"
 )
 
-const semVer string = "1.4.0"
+const semVer string = "1.6.0"
 
 // Search regex pattern in given file, print matching lines
 func searchInFile(filePath string, pattern *regexp.Regexp) error {
@@ -55,16 +55,28 @@ func searchInDirectory(directory string, pattern *regexp.Regexp) error {
 	})
 }
 
+// hasSelectorFlag reports whether any "selector" flags are explicitly set.
+// Selectors choose *which* resource to operate on, not *how* to operate.
+func hasSelectorFlag() bool {
+	selected := false
+	flag.CommandLine.Visit(func(f *flag.Flag) {
+		if f.Name == "n" || f.Name == "y" || f.Name == "s" || f.Name == "p" {
+			selected = true
+		}
+	})
+	return selected
+}
+
 func main() {
 	// File Path Override
 	lsqDirPath := flag.String("d", "", "The path to the Logseq directory to use.")
 
-	apndStdin := flag.Bool("A", false, "Append STDIN to the current journal page. This will not open $EDITOR.")
-	apnd := flag.String("a", "", "Append text to the current journal page. This will not open $EDITOR.")
+	apndStdin := flag.Bool("A", false, "Append STDIN to the current journal page.")
+	apnd := flag.String("a", "", "Append text to the current journal page.")
 	catFile := flag.Bool("c", false, "Print journal or page content to STDOUT instead of opening an editor.")
 	editorType := flag.String("e", "", "The external editor to use. Will use $EDITOR when blank or omitted.")
 	cliSearch := flag.String("f", "", "Search by file name in your pages directory.")
-	indent := flag.Int("i", 0, "Absolute indentation level (number of tab characters) for appended text. Requires -a or -A.")
+	indent := flag.Int("i", 0, "Absolute indentation level (number of tab characters) for appended text.")
 	daysAgo := flag.Int("n", 0, "Number of days ago to target for the journal entry.")
 	openFirstResult := flag.Bool("o", false, "Open the first result from search automatically.")
 	pageToOpen := flag.String("p", "", "Open a specific page from the pages directory. Must be a file name with extension.")
@@ -72,6 +84,7 @@ func main() {
 	specDate := flag.String("s", "", "Open a specific journal. Use yyyy-MM-dd after the flag.")
 	version := flag.Bool("v", false, "Display current lsq version")
 	yesterday := flag.Bool("y", false, "Open yesterday's journal page")
+	editMode := flag.Bool("E", false, "Open the journal page in your editor for editing (edit mode).")
 
 	flag.Parse()
 
@@ -90,11 +103,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *indent > 0 && *apnd == "" && !*apndStdin {
-		fmt.Fprintln(os.Stderr, "Error: -i requires -a or -A")
+	// Check if -i was explicitly provided (regardless of its value)
+	iExplicitlySet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "i" {
+			iExplicitlySet = true
+		}
+	})
+	if iExplicitlySet && *editMode {
+		fmt.Fprintln(os.Stderr, "Error: -i is incompatible with edit mode (-E). Use -a with -i for indented appending.")
 		os.Exit(1)
 	}
 
+	// Read STDIN when -A is explicitly used
 	if *apndStdin {
 		content, err := io.ReadAll(os.Stdin)
 		if err != nil {
@@ -102,6 +123,36 @@ func main() {
 			os.Exit(1)
 		}
 		*apnd = string(content)
+	}
+
+	// Read STDIN when piped (not a terminal), even without -A flag.
+	// Only read STDIN if no content was already provided by -a or -A.
+	if *apnd == "" {
+		stat, err := os.Stdin.Stat()
+		if err == nil && (stat.Mode()&os.ModeCharDevice) == 0 {
+			content, err := io.ReadAll(os.Stdin)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading STDIN: %v\n", err)
+				os.Exit(1)
+			}
+			if string(content) != "" {
+				*apnd = string(content)
+			}
+		}
+	}
+
+	// Collect positional arguments (free args) into apnd if no -a or -A was used
+	if *apnd == "" {
+		args := flag.Args()
+		if len(args) > 0 {
+			*apnd = strings.Join(args, " ")
+		}
+	}
+
+	// When called with no flags and no content, or with selector flags and no content,
+	// default to edit mode (equivalent to -E).
+	if (flag.NFlag() == 0 || hasSelectorFlag()) && *apnd == "" {
+		*editMode = true
 	}
 
 	cfg, err := config.Load()
@@ -143,11 +194,14 @@ func main() {
 				log.Printf("Error appending data to file: %v\n", err)
 				os.Exit(1)
 			}
-			// Don't open $EDITOR when append flag is used.
+			// Don't open $EDITOR when appending.
 			return
 		}
 
-		// Open page in default editor if specified:
+		// Open page in default editor only in edit mode.
+		if !*editMode {
+			return
+		}
 		system.LoadEditor(*editorType, pagePath)
 		return
 	}
@@ -237,14 +291,14 @@ func main() {
 		return
 	}
 
-	if *apnd != "" {
+	if !*editMode {
 		err := system.AppendToFile(journalPath, *apnd, *indent)
 		if err != nil {
 			log.Printf("Error appending data to file: %v\n", err)
 			os.Exit(1)
 		}
 
-		// Don't open $EDITOR  when append flag is used.
+		// Don't open $EDITOR  when in append (note) mode.
 		return
 	}
 
